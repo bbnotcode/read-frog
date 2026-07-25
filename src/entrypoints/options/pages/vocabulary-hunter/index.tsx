@@ -1,4 +1,4 @@
-import type { VocabularyWordInfo } from "@/utils/vocabulary-hunter/candidates"
+import type { VocabularyStatus, VocabularyWordInfo } from "@/utils/vocabulary-hunter/candidates"
 import type { VocabularyDictionary } from "@/utils/vocabulary-hunter/storage"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -24,6 +24,10 @@ import {
   VOCABULARY_LEVELS,
 } from "@/utils/vocabulary-hunter/dictionary-data"
 import {
+  lookupEmbeddedDictionary,
+  type EmbeddedDictionaryResult,
+} from "@/utils/vocabulary-hunter/dictionary-lookup"
+import {
   DEFAULT_VOCABULARY_HUNTER_STATE,
   getVocabularyHunterState,
   setVocabularyHunterState,
@@ -42,6 +46,12 @@ import { PageLayout } from "../../components/page-layout"
 
 type StatusFilter = "all" | "known" | "fuzzy" | "unknown"
 type ChartMode = "pie" | "bar" | "line"
+type VocabularyView = "study" | "compact"
+type VocabularySort = "difficulty" | "alphabetical" | "recent"
+type LookupDictionary = "haici" | "google"
+
+const PAGE_SIZE = 50
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")
 
 const STATUS_LABELS = {
   known: "已掌握",
@@ -70,6 +80,15 @@ export function VocabularyHunterPage() {
   const [gistToken, setGistToken] = useState("")
   const [gistLoading, setGistLoading] = useState(false)
   const [chartMode, setChartMode] = useState<ChartMode>("pie")
+  const [vocabularyView, setVocabularyView] = useState<VocabularyView>("study")
+  const [vocabularySort, setVocabularySort] = useState<VocabularySort>("difficulty")
+  const [letterFilter, setLetterFilter] = useState("")
+  const [page, setPage] = useState(1)
+  const [selectedWord, setSelectedWord] = useState("")
+  const [lookupDictionary, setLookupDictionary] = useState<LookupDictionary>("haici")
+  const [definition, setDefinition] = useState<EmbeddedDictionaryResult | null>(null)
+  const [definitionLoading, setDefinitionLoading] = useState(false)
+  const [definitionError, setDefinitionError] = useState("")
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -92,21 +111,76 @@ export function VocabularyHunterPage() {
     void setVocabularyHunterState(next)
   }
 
-  const words = useMemo(
-    () =>
-      Object.entries(state.statuses)
-        .filter(
-          ([word, status]) =>
-            (filter === "all" || status === filter) &&
-            word.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-        )
-        .sort(([left], [right]) => {
-          const leftRank = getVocabularyLevel(dictionary.get(left)?.level).rank
-          const rightRank = getVocabularyLevel(dictionary.get(right)?.level).rank
-          return rightRank - leftRank || left.localeCompare(right)
-        }),
-    [dictionary, filter, query, state.statuses],
+  const words = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase()
+    return Object.entries(state.statuses)
+      .filter(
+        ([word, status]) =>
+          (filter === "all" || status === filter) &&
+          (!letterFilter || word.toLocaleUpperCase().startsWith(letterFilter)) &&
+          word.toLocaleLowerCase().includes(normalizedQuery),
+      )
+      .sort(([left], [right]) => {
+        if (vocabularySort === "alphabetical") return left.localeCompare(right)
+        if (vocabularySort === "recent") {
+          return (
+            (state.statusUpdatedAt[right] ?? 0) - (state.statusUpdatedAt[left] ?? 0) ||
+            left.localeCompare(right)
+          )
+        }
+        const leftRank = getVocabularyLevel(dictionary.get(left)?.level).rank
+        const rightRank = getVocabularyLevel(dictionary.get(right)?.level).rank
+        return rightRank - leftRank || left.localeCompare(right)
+      })
+  }, [
+    dictionary,
+    filter,
+    letterFilter,
+    query,
+    state.statuses,
+    state.statusUpdatedAt,
+    vocabularySort,
+  ])
+  const pageCount = Math.max(1, Math.ceil(words.length / PAGE_SIZE))
+  const pagedWords = useMemo(
+    () => words.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, words],
   )
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, letterFilter, query, vocabularySort, vocabularyView])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
+  useEffect(() => {
+    if (!selectedWord) {
+      setDefinition(null)
+      setDefinitionError("")
+      return undefined
+    }
+    let cancelled = false
+    setDefinition(null)
+    setDefinitionError("")
+    setDefinitionLoading(true)
+    void lookupEmbeddedDictionary(lookupDictionary, selectedWord)
+      .then((result) => {
+        if (!cancelled) setDefinition(result)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setDefinitionError(error instanceof Error ? error.message : "暂时无法查询释义")
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDefinitionLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [lookupDictionary, selectedWord])
 
   const counts = useMemo(
     () => ({
@@ -153,6 +227,15 @@ export function VocabularyHunterPage() {
     delete statusUpdatedAt[word]
     updateState({ ...state, statuses, statusUpdatedAt })
     void syncKnownWord(word, false, dictionary)
+  }
+
+  const updateWordStatus = (word: string, status: VocabularyStatus) => {
+    updateState({
+      ...state,
+      statuses: { ...state.statuses, [word]: status },
+      statusUpdatedAt: { ...state.statusUpdatedAt, [word]: Date.now() },
+    })
+    void syncKnownWord(word, status === "known", dictionary)
   }
 
   const importBackupText = async (text: string, source: string) => {
@@ -623,7 +706,7 @@ export function VocabularyHunterPage() {
           </div>
 
           <div className="rounded-2xl border bg-muted/20 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap gap-2">
                 {(["all", "known", "fuzzy", "unknown"] as const).map((item) => (
                   <Button
@@ -638,38 +721,252 @@ export function VocabularyHunterPage() {
                   </Button>
                 ))}
               </div>
-              <Input
-                className="bg-background lg:max-w-xs"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索单词"
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 rounded-lg border bg-background px-3 text-sm"
+                  value={vocabularySort}
+                  onChange={(event) => setVocabularySort(event.target.value as VocabularySort)}
+                  aria-label="词汇排序"
+                >
+                  <option value="difficulty">按难度排序</option>
+                  <option value="alphabetical">按字母排序</option>
+                  <option value="recent">按最近判断排序</option>
+                </select>
+                <div className="flex rounded-lg border bg-background p-1">
+                  <button
+                    type="button"
+                    className={`rounded-md px-3 py-1 text-xs ${
+                      vocabularyView === "study"
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground"
+                    }`}
+                    onClick={() => setVocabularyView("study")}
+                  >
+                    学习卡片
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-md px-3 py-1 text-xs ${
+                      vocabularyView === "compact"
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground"
+                    }`}
+                    onClick={() => setVocabularyView("compact")}
+                  >
+                    紧凑列表
+                  </button>
+                </div>
+                <Input
+                  className="w-56 bg-background"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索单词"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-1">
+              <button
+                type="button"
+                className={`min-w-8 rounded-md px-2 py-1 text-xs ${
+                  letterFilter
+                    ? "text-muted-foreground hover:bg-background"
+                    : "bg-foreground text-background"
+                }`}
+                onClick={() => setLetterFilter("")}
+              >
+                全部
+              </button>
+              {ALPHABET.map((letter) => (
+                <button
+                  key={letter}
+                  type="button"
+                  className={`size-7 rounded-md text-xs ${
+                    letterFilter === letter
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:bg-background"
+                  }`}
+                  onClick={() => setLetterFilter(letterFilter === letter ? "" : letter)}
+                >
+                  {letter}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="max-h-[520px] overflow-auto rounded-2xl border bg-background shadow-sm">
+          {selectedWord && (
+            <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-background p-5 shadow-sm dark:border-emerald-900 dark:from-emerald-950/25">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-2xl font-bold tracking-tight">{selectedWord}</h3>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {getVocabularyLevel(dictionary.get(selectedWord)?.level).label}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    点击列表中的其他单词可直接切换，无需打开新网页。
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedWord("")}>
+                  收起
+                </Button>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                {(["haici", "google"] as const).map((item) => (
+                  <Button
+                    key={item}
+                    size="sm"
+                    variant={lookupDictionary === item ? "default" : "outline"}
+                    onClick={() => setLookupDictionary(item)}
+                  >
+                    {item === "haici" ? "海词" : "Google"}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border bg-background/90 p-4">
+                {definitionLoading ? (
+                  <p className="text-sm text-muted-foreground">正在查询中文释义…</p>
+                ) : definitionError ? (
+                  <p className="text-sm text-destructive">{definitionError}</p>
+                ) : definition?.entry ? (
+                  <div className="space-y-4">
+                    {definition.entry.phonetics.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {definition.entry.phonetics.map((item) => (
+                          <span
+                            key={`${item.region}-${item.value}`}
+                            className="rounded-lg bg-sky-50 px-3 py-1.5 font-mono text-sm text-sky-900 dark:bg-sky-950/40 dark:text-sky-200"
+                          >
+                            <b className="mr-2 font-sans text-xs text-sky-600">{item.region}</b>
+                            {item.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {definition.entry.meanings.map((item) => (
+                        <div
+                          key={`${item.partOfSpeech}-${item.definition}`}
+                          className="grid gap-2 sm:grid-cols-[64px_1fr]"
+                        >
+                          <span className="h-fit rounded-lg bg-emerald-50 px-2 py-1 text-center text-xs font-bold text-emerald-700 dark:bg-emerald-950/40">
+                            {item.partOfSpeech}
+                          </span>
+                          <span className="text-sm leading-6">{item.definition}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {definition.entry.forms && (
+                      <p className="border-t pt-3 text-sm text-muted-foreground">
+                        {definition.entry.forms}
+                      </p>
+                    )}
+                    {definition.entry.details && (
+                      <details className="border-t pt-3">
+                        <summary className="cursor-pointer text-sm font-medium text-emerald-700">
+                          查看更多释义与用法
+                        </summary>
+                        <p className="mt-3 max-h-64 overflow-auto text-sm leading-6 whitespace-pre-wrap text-muted-foreground">
+                          {definition.entry.details}
+                        </p>
+                      </details>
+                    )}
+                  </div>
+                ) : definition ? (
+                  <p className="text-sm leading-7 whitespace-pre-wrap">{definition.text}</p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-2xl border bg-background shadow-sm">
             {words.length === 0 ? (
               <p className="p-8 text-center text-sm text-muted-foreground">暂无匹配单词</p>
+            ) : vocabularyView === "compact" ? (
+              <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {pagedWords.map(([word, status]) => (
+                  <button
+                    key={word}
+                    type="button"
+                    className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-foreground/25 hover:bg-muted/40 ${
+                      selectedWord === word ? "border-emerald-500 bg-emerald-50/60" : ""
+                    }`}
+                    onClick={() => setSelectedWord(selectedWord === word ? "" : word)}
+                  >
+                    <span className="truncate text-sm font-semibold">{word}</span>
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: STATUS_COLORS[status] }}
+                      title={STATUS_LABELS[status]}
+                    />
+                  </button>
+                ))}
+              </div>
             ) : (
               <ul className="divide-y">
-                {words.map(([word, status]) => (
+                {pagedWords.map(([word, status]) => (
                   <li
                     key={word}
-                    className="flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-muted/35"
+                    className={`flex flex-col gap-3 px-5 py-4 transition hover:bg-muted/35 sm:flex-row sm:items-center sm:justify-between ${
+                      selectedWord === word ? "bg-emerald-50/60 dark:bg-emerald-950/20" : ""
+                    }`}
                   >
-                    <div className="min-w-0">
-                      <span className="font-semibold">{word}</span>
-                      <span
-                        className="ml-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                        style={{ backgroundColor: STATUS_COLORS[status] }}
-                      >
-                        {STATUS_LABELS[status]}
+                    <button
+                      type="button"
+                      className="min-w-0 text-left"
+                      onClick={() => setSelectedWord(selectedWord === word ? "" : word)}
+                    >
+                      <span className="text-base font-semibold">{word}</span>
+                      <span className="ml-3 text-xs text-muted-foreground">
+                        {selectedWord === word ? "收起释义" : "查看中文释义与音标"}
                       </span>
-                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {getVocabularyLevel(dictionary.get(word)?.level).label}
+                      <span className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                          style={{ backgroundColor: STATUS_COLORS[status] }}
+                        >
+                          {STATUS_LABELS[status]}
+                        </span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {getVocabularyLevel(dictionary.get(word)?.level).label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {state.statusUpdatedAt[word]
+                            ? `最近判断 ${new Date(state.statusUpdatedAt[word]).toLocaleDateString()}`
+                            : "历史导入"}
+                        </span>
                       </span>
-                    </div>
-                    <div className="flex gap-2">
+                    </button>
+                    <div className="flex flex-wrap gap-1">
+                      {status !== "known" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateWordStatus(word, "known")}
+                        >
+                          已掌握
+                        </Button>
+                      )}
+                      {status !== "fuzzy" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateWordStatus(word, "fuzzy")}
+                        >
+                          待巩固
+                        </Button>
+                      )}
+                      {status !== "unknown" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateWordStatus(word, "unknown")}
+                        >
+                          未掌握
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => removeWord(word)}>
                         清除判断
                       </Button>
@@ -679,6 +976,32 @@ export function VocabularyHunterPage() {
               </ul>
             )}
           </div>
+
+          {words.length > PAGE_SIZE && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 px-4 py-3">
+              <span className="text-sm text-muted-foreground">
+                共 {words.length} 个词，第 {page} / {pageCount} 页，每页 {PAGE_SIZE} 个
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  上一页
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= pageCount}
+                  onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                >
+                  下一页
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </ConfigCard>
     </PageLayout>

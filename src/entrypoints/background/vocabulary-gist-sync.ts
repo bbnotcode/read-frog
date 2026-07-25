@@ -4,7 +4,11 @@ import {
   getVocabularyHunterState,
   setVocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
-import { syncKnownWords, syncWordsToWordHunterGist } from "@/utils/vocabulary-hunter/sync"
+import {
+  mergeVocabularyStatusesByUpdatedAt,
+  syncKnownWords,
+  syncWordsToWordHunterGist,
+} from "@/utils/vocabulary-hunter/sync"
 
 const ALARM_NAME = "read-frog-vocabulary-gist-sync"
 let running = false
@@ -30,17 +34,25 @@ async function runVocabularyGistSync() {
       if (status === "known") mergedWords.add(lemma)
     })
     await syncKnownWords(mergedWords, dictionary)
-    await setVocabularyHunterState({
-      ...state,
+    const latestState = await getVocabularyHunterState()
+    const merged = mergeVocabularyStatusesByUpdatedAt(
+      latestState.statuses,
+      latestState.statusUpdatedAt,
       statuses,
-      statusUpdatedAt: synced.updatedAt,
+      synced.updatedAt,
+    )
+    await setVocabularyHunterState({
+      ...latestState,
+      statuses: merged.statuses,
+      statusUpdatedAt: merged.updatedAt,
       gistLastSyncAt: Date.now(),
       gistLastSyncCount: synced.count,
       gistSyncError: "",
     })
   } catch (error) {
+    const latestState = await getVocabularyHunterState()
     await setVocabularyHunterState({
-      ...state,
+      ...latestState,
       gistSyncError: error instanceof Error ? error.message : "自动同步失败",
     })
   } finally {

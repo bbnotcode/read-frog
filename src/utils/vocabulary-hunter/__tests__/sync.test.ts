@@ -1,5 +1,35 @@
 import { describe, expect, it } from "vitest"
-import { readWordHunterBackup } from "../sync"
+import { mergeVocabularyStatusesByUpdatedAt, readWordHunterBackup } from "../sync"
+
+describe("mergeVocabularyStatusesByUpdatedAt", () => {
+  it("keeps a newer local shortcut judgement when an older sync finishes later", () => {
+    expect(
+      mergeVocabularyStatusesByUpdatedAt(
+        { transient: "known" },
+        { transient: 200 },
+        { transient: "unknown" },
+        { transient: 100 },
+      ),
+    ).toEqual({
+      statuses: { transient: "known" },
+      updatedAt: { transient: 200 },
+    })
+  })
+
+  it("accepts newer remote judgements and retains local-only words", () => {
+    expect(
+      mergeVocabularyStatusesByUpdatedAt(
+        { local: "fuzzy", updated: "unknown" },
+        { local: 300, updated: 100 },
+        { updated: "known", remote: "fuzzy" },
+        { updated: 200, remote: 150 },
+      ),
+    ).toEqual({
+      statuses: { local: "fuzzy", updated: "known", remote: "fuzzy" },
+      updatedAt: { local: 300, updated: 200, remote: 150 },
+    })
+  })
+})
 
 describe("readWordHunterBackup", () => {
   it("reads a regular Word Hunter backup", () => {

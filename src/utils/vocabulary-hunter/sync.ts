@@ -5,6 +5,27 @@ import { browser } from "#imports"
 const BUCKET_SIZE = 400
 const BUCKET_PREFIX = "rf_vocabulary_known_"
 
+export function mergeVocabularyStatusesByUpdatedAt(
+  localStatuses: Record<string, VocabularyStatus>,
+  localUpdatedAt: Record<string, number>,
+  syncedStatuses: Record<string, VocabularyStatus>,
+  syncedUpdatedAt: Record<string, number>,
+) {
+  const statuses = { ...localStatuses }
+  const updatedAt = { ...localUpdatedAt }
+
+  Object.entries(syncedStatuses).forEach(([word, status]) => {
+    const incomingUpdatedAt = syncedUpdatedAt[word] ?? 0
+    const localWordUpdatedAt = updatedAt[word] ?? 0
+    if (!(word in statuses) || incomingUpdatedAt >= localWordUpdatedAt) {
+      statuses[word] = status
+      updatedAt[word] = incomingUpdatedAt
+    }
+  })
+
+  return { statuses, updatedAt }
+}
+
 function bucketKey(index: number) {
   return `${BUCKET_PREFIX}${Math.floor(index / BUCKET_SIZE)}`
 }

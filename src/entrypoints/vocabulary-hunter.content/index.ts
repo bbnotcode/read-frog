@@ -20,6 +20,7 @@ import {
   loadVocabularyDictionary,
 } from "@/utils/vocabulary-hunter/dictionary-data"
 import { lookupEmbeddedDictionary } from "@/utils/vocabulary-hunter/dictionary-lookup"
+import { isEnglishVocabularyContext } from "@/utils/vocabulary-hunter/english-context"
 import {
   getVocabularyHunterState,
   setVocabularyHunterState,
@@ -27,7 +28,11 @@ import {
   type VocabularyDictionary,
   watchVocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
-import { mergeKnownWordsFromSync, syncKnownWord } from "@/utils/vocabulary-hunter/sync"
+import {
+  mergeKnownWordsFromSync,
+  mergeVocabularyStatusesByUpdatedAt,
+  syncKnownWord,
+} from "@/utils/vocabulary-hunter/sync"
 import {
   buildSelectionToolbarCustomActionSystemPrompt,
   replaceSelectionToolbarCustomActionPromptTokens,
@@ -67,6 +72,35 @@ function isTextNodeEligible(node: Text, uiHost: HTMLElement) {
   if (parent.isContentEditable || parent.closest("[contenteditable='true']")) return false
   if (INVALID_TAGS.has(parent.tagName) || parent.closest(INVALID_ANCESTOR_SELECTOR)) return false
   return parent.getAttribute("aria-hidden") !== "true"
+}
+
+function isUsernameMention(node: Text, wordStart: number) {
+  if (node.data.slice(0, wordStart).trimEnd().endsWith("@")) return true
+
+  // X and similar sites may render "@" and the handle in separate nested spans.
+  // In that case, use the complete link label instead of only this text node.
+  const link = node.parentElement?.closest("a[href]")
+  return /^@[a-z\d_]{1,30}$/i.test(link?.textContent?.trim() ?? "")
+}
+
+function findLanguageContext(node: Text) {
+  const parent = node.parentElement
+  if (!parent) return null
+
+  const message = parent.closest(
+    "[data-list-item-id^='chat-messages'],[data-testid='tweetText'],article,[role='article']",
+  )
+  if (message?.textContent?.trim()) return message
+
+  let context: Element | null = parent
+  let fallback: Element | null = null
+  for (let depth = 0; context && depth < 6; depth += 1) {
+    const textLength = context.textContent?.trim().length ?? 0
+    if (textLength >= 20 && textLength <= 1200) fallback = context
+    if (textLength >= 80 || textLength > 1200) break
+    context = context.parentElement
+  }
+  return fallback
 }
 
 function safeColor(value: string, fallback: string) {
@@ -377,18 +411,26 @@ async function start(ctx: ContentScriptContext) {
           statuses[lemma] = status
           statusUpdatedAt[lemma] = synced.updatedAt[word] ?? 0
         })
-        state = {
-          ...currentState,
+        const latestState = await getVocabularyHunterState()
+        const merged = mergeVocabularyStatusesByUpdatedAt(
+          latestState.statuses,
+          latestState.statusUpdatedAt,
           statuses,
           statusUpdatedAt,
+        )
+        state = {
+          ...latestState,
+          statuses: merged.statuses,
+          statusUpdatedAt: merged.updatedAt,
           gistLastSyncAt: Date.now(),
           gistLastSyncCount: synced.count,
           gistSyncError: "",
         }
         await setVocabularyHunterState(state)
       } catch (error) {
+        const latestState = await getVocabularyHunterState()
         state = {
-          ...currentState,
+          ...latestState,
           gistSyncError: error instanceof Error ? error.message : "自动同步失败",
         }
         await setVocabularyHunterState(state)
@@ -609,10 +651,19 @@ async function start(ctx: ContentScriptContext) {
     clearHighlights()
     if (!state.enabled || !document.body) return
 
+    const englishContextCache = new WeakMap<Element, boolean>()
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
     while (walker.nextNode() && trackedRanges.length < MAX_RANGES) {
       const node = walker.currentNode as Text
       if (!isTextNodeEligible(node, host)) continue
+      const languageContext = findLanguageContext(node)
+      if (!languageContext) continue
+      let isEnglish = englishContextCache.get(languageContext)
+      if (isEnglish === undefined) {
+        isEnglish = isEnglishVocabularyContext(languageContext.textContent ?? "")
+        englishContextCache.set(languageContext, isEnglish)
+      }
+      if (!isEnglish) continue
       for (const occurrence of findCandidateWords(
         node.data,
         state.minimumLength,
@@ -621,6 +672,7 @@ async function start(ctx: ContentScriptContext) {
         new Set(state.enabledLevels),
       )) {
         if (trackedRanges.length >= MAX_RANGES) break
+        if (isUsernameMention(node, occurrence.start)) continue
         const range = document.createRange()
         range.setStart(node, occurrence.start)
         range.setEnd(node, occurrence.end)
