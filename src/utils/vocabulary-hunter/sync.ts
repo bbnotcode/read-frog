@@ -1,4 +1,4 @@
-import type { VocabularyWordInfo } from "./candidates"
+import type { VocabularyStatus, VocabularyWordInfo } from "./candidates"
 import type { VocabularyHunterState } from "./storage"
 import { browser } from "#imports"
 
@@ -68,7 +68,7 @@ export async function mergeKnownWordsFromSync(
     for (let offset = 0; offset < bitmap.length; offset += 1) {
       if (bitmap[offset] !== "1") continue
       const word = indexedWords[bucketIndex * BUCKET_SIZE + offset]
-      if (word && statuses[word] !== "known") {
+      if (word && statuses[word] === undefined) {
         statuses[word] = "known"
         changed = true
       }
@@ -157,7 +157,8 @@ export async function fetchWordHunterGist(gistUrlOrId: string, token?: string) {
 export async function syncWordsToWordHunterGist(
   gistUrlOrId: string,
   token: string,
-  localKnownWords: Iterable<string>,
+  localStatuses: Record<string, VocabularyStatus>,
+  localUpdatedAt: Record<string, number>,
 ) {
   if (!token.trim()) throw new Error("写入 Gist 必须填写具有 Gist 权限的访问令牌")
   const gistId = parseGistId(gistUrlOrId)
@@ -169,12 +170,47 @@ export async function syncWordsToWordHunterGist(
     !Array.isArray(remoteBackup.known)
       ? (remoteBackup.known as Record<string, unknown>)
       : {}
-  const mergedKnown = { ...remoteKnown }
-  for (const word of localKnownWords) mergedKnown[word] = "o"
+  const remoteReadFrog = remoteBackup.read_frog as
+    | {
+        statuses?: Record<string, { status?: VocabularyStatus; updatedAt?: number }>
+      }
+    | undefined
+  const mergedStatuses: Record<string, { status: VocabularyStatus; updatedAt: number }> = {}
+  Object.keys(remoteKnown).forEach((word) => {
+    mergedStatuses[word] = { status: "known", updatedAt: 0 }
+  })
+  Object.entries(remoteReadFrog?.statuses ?? {}).forEach(([word, entry]) => {
+    if (
+      entry &&
+      ["known", "fuzzy", "unknown"].includes(entry.status ?? "") &&
+      typeof entry.updatedAt === "number"
+    ) {
+      mergedStatuses[word] = {
+        status: entry.status as VocabularyStatus,
+        updatedAt: entry.updatedAt,
+      }
+    }
+  })
+  Object.entries(localStatuses).forEach(([word, status]) => {
+    const updatedAt = localUpdatedAt[word] ?? 0
+    if (!mergedStatuses[word] || updatedAt >= mergedStatuses[word].updatedAt) {
+      mergedStatuses[word] = { status, updatedAt }
+    }
+  })
+  const mergedKnown = Object.fromEntries(
+    Object.entries(mergedStatuses)
+      .filter(([, entry]) => entry.status === "known")
+      .map(([word]) => [word, "o"]),
+  )
   const now = Date.now()
   const content = JSON.stringify({
     ...remoteBackup,
     known: mergedKnown,
+    read_frog: {
+      version: 1,
+      statuses: mergedStatuses,
+      updatedAt: now,
+    },
     context: remoteBackup.context ?? {},
     settings: remoteBackup.settings ?? {},
     knwon_update_timestamp: now,
@@ -198,6 +234,11 @@ export async function syncWordsToWordHunterGist(
   }
   return {
     count: Object.keys(mergedKnown).length,
-    words: Object.keys(mergedKnown),
+    statuses: Object.fromEntries(
+      Object.entries(mergedStatuses).map(([word, entry]) => [word, entry.status]),
+    ) as Record<string, VocabularyStatus>,
+    updatedAt: Object.fromEntries(
+      Object.entries(mergedStatuses).map(([word, entry]) => [word, entry.updatedAt]),
+    ),
   }
 }

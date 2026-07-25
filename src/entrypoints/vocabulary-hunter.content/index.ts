@@ -11,6 +11,7 @@ import { resolveProviderRefForCapability } from "@/utils/providers/provider-regi
 import { getTopLevelReasoning } from "@/utils/providers/reasoning"
 import {
   findCandidateWords,
+  normalizeSelectedWord,
   type VocabularyLevel,
   type VocabularyStatus,
 } from "@/utils/vocabulary-hunter/candidates"
@@ -35,6 +36,8 @@ import {
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
 const MAX_RANGES = 1200
+const INVALID_ANCESTOR_SELECTOR =
+  "button,canvas,code,input,kbd,noscript,option,pre,script,select,style,svg,textarea,[role='button']"
 const INVALID_TAGS = new Set([
   "BUTTON",
   "CANVAS",
@@ -62,7 +65,7 @@ function isTextNodeEligible(node: Text, uiHost: HTMLElement) {
   if (!parent || !node.data.trim()) return false
   if (uiHost.contains(parent) || parent.closest("[data-read-frog-vocabulary-ui]")) return false
   if (parent.isContentEditable || parent.closest("[contenteditable='true']")) return false
-  if (INVALID_TAGS.has(parent.tagName)) return false
+  if (INVALID_TAGS.has(parent.tagName) || parent.closest(INVALID_ANCESTOR_SELECTOR)) return false
   return parent.getAttribute("aria-hidden") !== "true"
 }
 
@@ -123,6 +126,8 @@ function createHoverCard() {
       .judgement button{min-width:0;border:0;background:transparent;white-space:nowrap}.judgement button.active[data-action=known]{background:#dcfce7;color:#166534}
       .judgement button.active[data-action=fuzzy]{background:#fef3c7;color:#92400e}
       .judgement button.active[data-action=unknown]{background:#ffe4e6;color:#9f1239}
+      .shortcut{display:inline-grid;place-items:center;min-width:19px;height:19px;margin-left:5px;padding:0 5px;border:1px solid currentColor;
+        border-radius:6px;background:#fff9;font:700 10px/1 ui-monospace,SFMono-Regular,monospace;vertical-align:1px}
       .tabs{padding-bottom:2px;border-bottom:1px solid #e6ece8}.tabs button{font-size:12px;padding:7px 9px;cursor:grab}
       .tabs button.dragging{opacity:.45}.tabs button.drag-over{outline:2px solid #79a98b;outline-offset:2px}
       .tabs button[data-dict=haici]{color:#087f5b}.tabs button[data-dict=ai]{color:#6d28d9}
@@ -153,14 +158,12 @@ function createHoverCard() {
       </div>
       <div class="sentence" id="sentence"></div>
       <div class="row judgement">
-        <button data-action="known" title="快捷键 Alt+1">✓ 已掌握</button>
-        <button data-action="fuzzy" title="快捷键 Alt+2">◐ 待巩固</button>
-        <button data-action="unknown" title="快捷键 Alt+3">○ 未掌握</button>
+        <button data-action="known" title="快捷键 A">✓ 已掌握 <kbd class="shortcut">A</kbd></button>
+        <button data-action="fuzzy" title="快捷键 S">◐ 待巩固 <kbd class="shortcut">S</kbd></button>
+        <button data-action="unknown" title="快捷键 D">○ 未掌握 <kbd class="shortcut">D</kbd></button>
       </div>
       <div class="row tabs" id="tabs">
         <button draggable="true" data-dict="haici">海词</button>
-        <button draggable="true" data-dict="collins">Collins</button>
-        <button draggable="true" data-dict="longman">Longman</button>
         <button draggable="true" data-dict="google">Google</button>
         <button draggable="true" data-dict="ai">AI 解释</button>
       </div>
@@ -191,12 +194,9 @@ function findLinkForRange(range: Range) {
 function positionCard(card: HTMLElement, range: Range) {
   const rect = range.getBoundingClientRect()
   const viewportPadding = 12
+  const triggerGap = 12
   const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2)
   const cardWidth = Math.min(430, availableWidth)
-  const cardHeight = Math.min(
-    card.scrollHeight || 320,
-    Math.max(0, window.innerHeight - viewportPadding * 2),
-  )
   const preferredLeft =
     rect.left + cardWidth <= window.innerWidth - viewportPadding
       ? rect.left
@@ -205,16 +205,18 @@ function positionCard(card: HTMLElement, range: Range) {
     viewportPadding,
     Math.min(preferredLeft, window.innerWidth - cardWidth - viewportPadding),
   )
-  const below = rect.bottom + 8
-  const top =
-    below + cardHeight <= window.innerHeight - viewportPadding
-      ? below
-      : Math.max(
-          viewportPadding,
-          Math.min(rect.top - cardHeight - 8, window.innerHeight - cardHeight - viewportPadding),
-        )
+  const spaceBelow = Math.max(0, window.innerHeight - viewportPadding - rect.bottom - triggerGap)
+  const spaceAbove = Math.max(0, rect.top - viewportPadding - triggerGap)
+  const naturalHeight = card.scrollHeight || 320
+  const placeBelow = naturalHeight <= spaceBelow || spaceBelow >= spaceAbove
+  const availableHeight = placeBelow ? spaceBelow : spaceAbove
+  const cardHeight = Math.min(naturalHeight, availableHeight)
+  const top = placeBelow
+    ? rect.bottom + triggerGap
+    : Math.max(viewportPadding, rect.top - triggerGap - cardHeight)
+
   card.style.width = `${cardWidth}px`
-  card.style.maxHeight = `${Math.max(0, window.innerHeight - viewportPadding * 2)}px`
+  card.style.maxHeight = `${availableHeight}px`
   card.style.left = `${left}px`
   card.style.top = `${top}px`
 }
@@ -360,24 +362,25 @@ async function start(ctx: ContentScriptContext) {
     gistSyncTimer = setTimeout(async () => {
       const currentState = await getVocabularyHunterState()
       if (!currentState.gistAutoSync || !currentState.gistId || !currentState.gistToken) return
-      const knownWords = Object.entries(currentState.statuses)
-        .filter(([, status]) => status === "known")
-        .map(([word]) => word)
       try {
         const synced = await sendMessage("syncVocabularyGist", {
           gistId: currentState.gistId,
           token: currentState.gistToken,
-          words: knownWords,
+          statuses: currentState.statuses,
+          updatedAt: currentState.statusUpdatedAt,
         })
-        const statuses = { ...currentState.statuses }
-        synced.words.forEach((word) => {
+        const statuses: VocabularyHunterState["statuses"] = {}
+        const statusUpdatedAt: Record<string, number> = {}
+        Object.entries(synced.statuses).forEach(([word, status]) => {
           const lemma =
             vocabularyDictionary?.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase()
-          statuses[lemma] = "known"
+          statuses[lemma] = status
+          statusUpdatedAt[lemma] = synced.updatedAt[word] ?? 0
         })
         state = {
           ...currentState,
           statuses,
+          statusUpdatedAt,
           gistLastSyncAt: Date.now(),
           gistLastSyncCount: synced.count,
           gistSyncError: "",
@@ -633,16 +636,30 @@ async function start(ctx: ContentScriptContext) {
     refreshTimer = setTimeout(refresh, 350)
   }
 
-  const hitTest = (event: MouseEvent) =>
-    trackedRanges.find(({ range }) => {
-      const rect = range.getBoundingClientRect()
-      return (
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom
-      )
-    })
+  const hitTest = (event: MouseEvent) => {
+    const target = event.target
+    if (!(target instanceof Node)) return undefined
+
+    return trackedRanges
+      .filter(({ range }) => {
+        const parent = range.startContainer.parentElement
+        if (!parent || !(parent === target || parent.contains(target) || target.contains(parent))) {
+          return false
+        }
+        return Array.from(range.getClientRects()).some(
+          (rect) =>
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom,
+        )
+      })
+      .sort((left, right) => {
+        const leftRect = left.range.getBoundingClientRect()
+        const rightRect = right.range.getBoundingClientRect()
+        return leftRect.width * leftRect.height - rightRect.width * rightRect.height
+      })[0]
+  }
 
   document.addEventListener(
     "mousemove",
@@ -673,6 +690,13 @@ async function start(ctx: ContentScriptContext) {
     "click",
     (event) => {
       if (!state.enabled || event.composedPath().includes(host)) return
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest("a[href],button,input,select,textarea,summary,[role='button'],[role='link']")
+      ) {
+        return
+      }
       const hit = hitTest(event)
       if (!hit) return
       event.preventDefault()
@@ -682,11 +706,42 @@ async function start(ctx: ContentScriptContext) {
     true,
   )
 
+  const showSelectedWord = () => {
+    if (!state.enabled) return
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return
+    const normalizedWord = normalizeSelectedWord(selection.toString())
+    if (!normalizedWord) return
+    const range = selection.getRangeAt(0)
+    const container =
+      range.commonAncestorContainer instanceof Element
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement
+    if (
+      !container ||
+      host.contains(container) ||
+      container.closest(
+        "input,textarea,select,button,[role='button'],[contenteditable='true'],[data-read-frog-vocabulary-ui]",
+      )
+    ) {
+      return
+    }
+    const wordInfo = vocabularyDictionary?.get(normalizedWord)
+    showCard({
+      range: range.cloneRange(),
+      word: wordInfo?.lemma ?? normalizedWord,
+      level: wordInfo?.level,
+    })
+  }
+  document.addEventListener("mouseup", showSelectedWord, true)
+
   card.addEventListener("mouseenter", () => clearTimeout(hideTimer))
   card.addEventListener("mouseleave", hideCardSoon)
   const keepCardInViewport = () => {
     if (selected && card.classList.contains("open")) positionCard(card, selected.range)
   }
+  const cardResizeObserver = new ResizeObserver(keepCardInViewport)
+  cardResizeObserver.observe(card)
   window.addEventListener("resize", keepCardInViewport)
   window.addEventListener("scroll", keepCardInViewport, true)
 
@@ -729,37 +784,45 @@ async function start(ctx: ContentScriptContext) {
     })
   })
 
-  const markSelected = (status: VocabularyStatus) => {
-    if (!selected) return
-    const selectedWord = selected.word
+  const markWord = async (word: string, status: VocabularyStatus) => {
     state = {
       ...state,
       statuses: {
         ...state.statuses,
-        [selected.word]: status,
+        [word]: status,
+      },
+      statusUpdatedAt: {
+        ...state.statusUpdatedAt,
+        [word]: Date.now(),
       },
     }
-    void save()
+
+    const matchingRanges = trackedRanges.filter((item) => item.word === word)
+    matchingRanges.forEach(({ range }) => {
+      unknownHighlight.delete(range)
+      fuzzyHighlight.delete(range)
+      range.detach()
+    })
+    trackedRanges = trackedRanges.filter((item) => item.word !== word)
+
+    await save()
+    refresh()
     if (vocabularyDictionary) {
-      void syncKnownWord(selectedWord, status === "known", vocabularyDictionary)
+      void syncKnownWord(word, status === "known", vocabularyDictionary)
     }
     scheduleGistAutoSync()
+  }
+
+  const markSelected = async (status: VocabularyStatus) => {
+    if (!selected) return
+    const selectedWord = selected.word
     card.classList.remove("open")
     selected = null
-    refresh()
+
+    await markWord(selectedWord, status)
   }
 
   const handleShortcut = (event: KeyboardEvent) => {
-    if (
-      !event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      !selected ||
-      !card.classList.contains("open")
-    ) {
-      return
-    }
     const target = event.target
     if (
       target instanceof HTMLInputElement ||
@@ -768,16 +831,31 @@ async function start(ctx: ContentScriptContext) {
     ) {
       return
     }
-    const statusByKey: Record<string, VocabularyStatus | undefined> = {
-      "1": "known",
-      "2": "fuzzy",
-      "3": "unknown",
+    if (event.altKey || event.ctrlKey || event.metaKey) return
+    const key = event.key.toLowerCase()
+    const pageSelection = window.getSelection()
+    if (key === "d" && pageSelection && !pageSelection.isCollapsed) {
+      const normalizedWord = normalizeSelectedWord(pageSelection.toString())
+      if (!normalizedWord) return
+      const word = vocabularyDictionary?.get(normalizedWord)?.lemma ?? normalizedWord
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      card.classList.remove("open")
+      selected = null
+      void markWord(word, "unknown")
+      return
     }
-    const status = statusByKey[event.key]
+    if (!selected || !card.classList.contains("open")) return
+    const statusByKey: Record<string, VocabularyStatus | undefined> = {
+      a: "known",
+      s: "fuzzy",
+      d: "unknown",
+    }
+    const status = statusByKey[key]
     if (!status) return
     event.preventDefault()
     event.stopImmediatePropagation()
-    markSelected(status)
+    void markSelected(status)
   }
   document.addEventListener("keydown", handleShortcut, true)
 
@@ -835,7 +913,7 @@ async function start(ctx: ContentScriptContext) {
     }
     if (!selected) return
 
-    markSelected(action as VocabularyStatus)
+    void markSelected(action as VocabularyStatus)
   })
 
   const observer = new MutationObserver((mutations) => {
@@ -857,9 +935,11 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hoverTimer)
     clearTimeout(gistSyncTimer)
     observer.disconnect()
+    cardResizeObserver.disconnect()
     window.removeEventListener("resize", keepCardInViewport)
     window.removeEventListener("scroll", keepCardInViewport, true)
     document.removeEventListener("keydown", handleShortcut, true)
+    document.removeEventListener("mouseup", showSelectedWord, true)
     unwatchState()
     clearHighlights()
     CSS.highlights.delete(UNKNOWN_HIGHLIGHT)

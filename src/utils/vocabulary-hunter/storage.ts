@@ -2,7 +2,8 @@ import type { VocabularyLevel, VocabularyStatus } from "./candidates"
 import { storage } from "#imports"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
-export type VocabularyDictionary = "haici" | "collins" | "longman" | "google" | "ai"
+export type VocabularyDictionary = "haici" | "google" | "ai"
+const SUPPORTED_DICTIONARIES: VocabularyDictionary[] = ["haici", "google", "ai"]
 
 export interface VocabularyHunterState {
   enabled: boolean
@@ -19,14 +20,15 @@ export interface VocabularyHunterState {
   gistLastSyncCount: number
   gistSyncError: string
   statuses: Record<string, VocabularyStatus>
+  statusUpdatedAt: Record<string, number>
 }
 
 export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   enabled: true,
   minimumLength: 2,
   enabledLevels: ["p", "m", "h", "4", "6", "g", "o"],
-  enabledDictionaries: ["haici", "collins", "longman", "google", "ai"],
-  dictionaryOrder: ["haici", "collins", "longman", "google", "ai"],
+  enabledDictionaries: [...SUPPORTED_DICTIONARIES],
+  dictionaryOrder: [...SUPPORTED_DICTIONARIES],
   unknownHighlightColor: "#fb7185",
   fuzzyHighlightColor: "#fbbf24",
   gistId: "",
@@ -36,6 +38,7 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   gistLastSyncCount: 0,
   gistSyncError: "",
   statuses: {},
+  statusUpdatedAt: {},
 }
 
 function migrateState(
@@ -49,11 +52,27 @@ function migrateState(
       status === "learning" ? "fuzzy" : status === "ignored" ? "known" : status,
     ]),
   ) as Record<string, VocabularyStatus>
+  const enabledDictionaries = SUPPORTED_DICTIONARIES.filter((dictionary) =>
+    state.enabledDictionaries?.includes(dictionary),
+  )
+  const savedOrder = (state.dictionaryOrder ?? []).filter((dictionary) =>
+    SUPPORTED_DICTIONARIES.includes(dictionary),
+  )
+  const dictionaryOrder = [
+    ...savedOrder,
+    ...SUPPORTED_DICTIONARIES.filter((dictionary) => !savedOrder.includes(dictionary)),
+  ]
 
   return {
     ...DEFAULT_VOCABULARY_HUNTER_STATE,
     ...state,
+    enabledDictionaries:
+      state.enabledDictionaries === undefined
+        ? [...DEFAULT_VOCABULARY_HUNTER_STATE.enabledDictionaries]
+        : enabledDictionaries,
+    dictionaryOrder,
     statuses,
+    statusUpdatedAt: state.statusUpdatedAt ?? {},
   }
 }
 

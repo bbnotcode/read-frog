@@ -167,8 +167,13 @@ interface ProtocolMap {
   syncVocabularyGist: (data: {
     gistId: string
     token: string
-    words: string[]
-  }) => Promise<{ count: number; words: string[] }>
+    statuses: Record<string, "known" | "fuzzy" | "unknown">
+    updatedAt: Record<string, number>
+  }) => Promise<{
+    count: number
+    statuses: Record<string, "known" | "fuzzy" | "unknown">
+    updatedAt: Record<string, number>
+  }>
   // cache management
   clearAllTranslationRelatedCache: () => Promise<void>
   clearAiSegmentationCache: () => Promise<void>

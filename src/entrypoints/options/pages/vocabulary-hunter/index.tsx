@@ -36,8 +36,6 @@ const STATUS_LABELS = {
 
 const DICTIONARY_LABELS: Record<VocabularyDictionary, string> = {
   haici: "海词词典",
-  collins: "Collins",
-  longman: "Longman",
   google: "Google 词典",
   ai: "ReadFrog AI",
 }
@@ -100,8 +98,10 @@ export function VocabularyHunterPage() {
 
   const removeWord = (word: string) => {
     const statuses = { ...state.statuses }
+    const statusUpdatedAt = { ...state.statusUpdatedAt }
     delete statuses[word]
-    updateState({ ...state, statuses })
+    delete statusUpdatedAt[word]
+    updateState({ ...state, statuses, statusUpdatedAt })
     void syncKnownWord(word, false, dictionary)
   }
 
@@ -114,10 +114,13 @@ export function VocabularyHunterPage() {
         ),
       )
       const statuses = { ...state.statuses }
+      const statusUpdatedAt = { ...state.statusUpdatedAt }
+      const importedAt = Date.now()
       lemmas.forEach((word) => {
         statuses[word] = "known"
+        statusUpdatedAt[word] = importedAt
       })
-      const nextState = { ...state, statuses }
+      const nextState = { ...state, statuses, statusUpdatedAt }
       updateState(nextState)
       await syncKnownWords(lemmas, dictionary)
       setSyncMessage(`已从${source}导入并同步 ${lemmas.size} 个已掌握单词`)
@@ -147,23 +150,26 @@ export function VocabularyHunterPage() {
     setGistLoading(true)
     setSyncMessage("")
     try {
-      const localKnownWords = Object.entries(state.statuses)
-        .filter(([, status]) => status === "known")
-        .map(([word]) => word)
-      const result = await syncWordsToWordHunterGist(gistUrl, gistToken, localKnownWords)
-      const mergedWords = new Set(
-        result.words.map(
-          (word) => dictionary.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase(),
-        ),
+      const result = await syncWordsToWordHunterGist(
+        gistUrl,
+        gistToken,
+        state.statuses,
+        state.statusUpdatedAt,
       )
-      const statuses = { ...state.statuses }
-      mergedWords.forEach((word) => {
-        statuses[word] = "known"
+      const statuses: VocabularyHunterState["statuses"] = {}
+      const statusUpdatedAt: Record<string, number> = {}
+      const mergedWords = new Set<string>()
+      Object.entries(result.statuses).forEach(([word, status]) => {
+        const lemma = dictionary.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase()
+        statuses[lemma] = status
+        statusUpdatedAt[lemma] = result.updatedAt[word] ?? 0
+        if (status === "known") mergedWords.add(lemma)
       })
       await syncKnownWords(mergedWords, dictionary)
       const nextState = {
         ...state,
         statuses,
+        statusUpdatedAt,
         gistId: gistUrl.trim(),
         gistToken: gistToken.trim(),
         gistAutoSync: true,
@@ -262,8 +268,9 @@ export function VocabularyHunterPage() {
           <div className="rounded-xl bg-muted/60 p-4">
             <div className="font-medium">悬浮卡快捷键</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              悬浮卡打开时：Alt+1 标记为已掌握，Alt+2 标记为待巩固，Alt+3
-              标记为未掌握。输入框和编辑区域内不会触发。
+              悬浮卡打开时：A 标记为已掌握，S 标记为待巩固，D
+              标记为未掌握。也可以先在网页中选中一个英文单词，再按 D
+              将它重新加入未掌握。快捷键会直接显示在悬浮卡按钮中；输入框和编辑区域内不会触发。
             </p>
           </div>
         </div>

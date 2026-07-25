@@ -111,6 +111,15 @@ export function normalizeWord(word: string) {
   return word.toLocaleLowerCase("en-US").replace(/[’']/g, "'")
 }
 
+export function normalizeSelectedWord(selection: string) {
+  const match = selection
+    .trim()
+    .match(/^[\s"'“”‘’()[\]{},.!?:;]*([a-z]+(?:[’'][a-z]+)?)[\s"'“”‘’()[\]{},.!?:;]*$/i)
+  if (!match) return undefined
+  const word = normalizeWord(match[1])
+  return /^[a-z]+(?:'[a-z]+)?$/i.test(word) ? word : undefined
+}
+
 export function findCandidateWords(
   text: string,
   minimumLength: number,

@@ -26,17 +26,6 @@ const DICTIONARIES: Record<
     url: (word) => `https://dict.cn/search?q=${encodeURIComponent(word)}`,
     selectors: [".main"],
   },
-  collins: {
-    title: "Collins",
-    url: (word) =>
-      `https://www.collinsdictionary.com/dictionary/english/${encodeURIComponent(word)}`,
-    selectors: ["#main_content .res_cell_center", "#main_content"],
-  },
-  longman: {
-    title: "Longman",
-    url: (word) => `https://www.ldoceonline.com/dictionary/${encodeURIComponent(word)}`,
-    selectors: [".responsive_cell6", ".dictionary"],
-  },
   google: {
     title: "Google 词典",
     url: (word) =>

@@ -16,21 +16,24 @@ async function runVocabularyGistSync() {
   running = true
   try {
     const dictionary = await loadVocabularyDictionary()
-    const knownWords = Object.entries(state.statuses)
-      .filter(([, status]) => status === "known")
-      .map(([word]) => word)
-    const synced = await syncWordsToWordHunterGist(state.gistId, state.gistToken, knownWords)
-    const statuses = { ...state.statuses }
+    const synced = await syncWordsToWordHunterGist(
+      state.gistId,
+      state.gistToken,
+      state.statuses,
+      state.statusUpdatedAt,
+    )
+    const statuses = { ...synced.statuses }
     const mergedWords = new Set<string>()
-    synced.words.forEach((word) => {
+    Object.entries(synced.statuses).forEach(([word, status]) => {
       const lemma = dictionary.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase()
-      statuses[lemma] = "known"
-      mergedWords.add(lemma)
+      statuses[lemma] = status
+      if (status === "known") mergedWords.add(lemma)
     })
     await syncKnownWords(mergedWords, dictionary)
     await setVocabularyHunterState({
       ...state,
       statuses,
+      statusUpdatedAt: synced.updatedAt,
       gistLastSyncAt: Date.now(),
       gistLastSyncCount: synced.count,
       gistSyncError: "",

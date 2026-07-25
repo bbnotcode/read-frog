@@ -76,7 +76,12 @@ export default defineBackground({
     })
 
     onMessage("syncVocabularyGist", async (message) =>
-      syncWordsToWordHunterGist(message.data.gistId, message.data.token, message.data.words),
+      syncWordsToWordHunterGist(
+        message.data.gistId,
+        message.data.token,
+        message.data.statuses,
+        message.data.updatedAt,
+      ),
     )
 
     setupSidePanelMessageHandler({
