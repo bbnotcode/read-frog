@@ -1,6 +1,20 @@
 import type { VocabularyWordInfo } from "@/utils/vocabulary-hunter/candidates"
 import type { VocabularyDictionary } from "@/utils/vocabulary-hunter/storage"
 import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 import { Button } from "@/components/ui/base-ui/button"
 import { Input } from "@/components/ui/base-ui/input"
 import { Switch } from "@/components/ui/base-ui/switch"
@@ -27,11 +41,17 @@ import { ConfigCard } from "../../components/config-card"
 import { PageLayout } from "../../components/page-layout"
 
 type StatusFilter = "all" | "known" | "fuzzy" | "unknown"
+type ChartMode = "pie" | "bar" | "line"
 
 const STATUS_LABELS = {
   known: "已掌握",
   fuzzy: "待巩固",
   unknown: "未掌握",
+} as const
+const STATUS_COLORS = {
+  known: "#10b981",
+  fuzzy: "#f59e0b",
+  unknown: "#f43f5e",
 } as const
 
 const DICTIONARY_LABELS: Record<VocabularyDictionary, string> = {
@@ -49,6 +69,7 @@ export function VocabularyHunterPage() {
   const [gistUrl, setGistUrl] = useState("")
   const [gistToken, setGistToken] = useState("")
   const [gistLoading, setGistLoading] = useState(false)
+  const [chartMode, setChartMode] = useState<ChartMode>("pie")
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -95,6 +116,35 @@ export function VocabularyHunterPage() {
     }),
     [state.statuses],
   )
+  const chartData = useMemo(
+    () =>
+      (["known", "fuzzy", "unknown"] as const).map((status) => ({
+        status,
+        name: STATUS_LABELS[status],
+        value: counts[status],
+        color: STATUS_COLORS[status],
+      })),
+    [counts],
+  )
+  const timelineData = useMemo(() => {
+    const today = new Date()
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(today)
+      day.setHours(23, 59, 59, 999)
+      day.setDate(today.getDate() - (6 - index))
+      const point = {
+        date: `${day.getMonth() + 1}/${day.getDate()}`,
+        known: 0,
+        fuzzy: 0,
+        unknown: 0,
+      }
+      Object.entries(state.statuses).forEach(([word, status]) => {
+        const updatedAt = state.statusUpdatedAt[word] ?? 0
+        if (updatedAt === 0 || updatedAt <= day.getTime()) point[status] += 1
+      })
+      return point
+    })
+  }, [state.statusUpdatedAt, state.statuses])
 
   const removeWord = (word: string) => {
     const statuses = { ...state.statuses }
@@ -189,6 +239,7 @@ export function VocabularyHunterPage() {
   return (
     <PageLayout title="生词猎手" innerClassName="flex flex-col px-8">
       <ConfigCard
+        layout="stacked"
         title="网页生词标注"
         description="生词卡会在鼠标悬浮时出现，不再显示独立的页面按钮。"
       >
@@ -277,6 +328,7 @@ export function VocabularyHunterPage() {
       </ConfigCard>
 
       <ConfigCard
+        layout="stacked"
         title="内嵌词典"
         description="释义直接显示在网页悬浮卡中，不会打开新的词典网页。海词默认排在第一位。"
       >
@@ -307,6 +359,7 @@ export function VocabularyHunterPage() {
       </ConfigCard>
 
       <ConfigCard
+        layout="stacked"
         title="已掌握词汇同步"
         description="已掌握单词使用与 Word Hunter 类似的压缩位图写入 Chrome Sync，可在登录同一 Chrome 账号的设备间同步。"
       >
@@ -448,69 +501,171 @@ export function VocabularyHunterPage() {
       </ConfigCard>
 
       <ConfigCard
+        layout="stacked"
         title="我的词汇"
         description="按难度从学术扩展、托福/GRE、雅思到基础词排序，集中查询你的学习判断。"
       >
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              className="rounded-xl border p-3 text-left"
-              onClick={() => setFilter("known")}
-            >
-              <span className="block text-2xl font-semibold">{counts.known}</span>
-              <span className="text-sm text-muted-foreground">已掌握</span>
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border p-3 text-left"
-              onClick={() => setFilter("fuzzy")}
-            >
-              <span className="block text-2xl font-semibold">{counts.fuzzy}</span>
-              <span className="text-sm text-muted-foreground">待巩固</span>
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border p-3 text-left"
-              onClick={() => setFilter("unknown")}
-            >
-              <span className="block text-2xl font-semibold">{counts.unknown}</span>
-              <span className="text-sm text-muted-foreground">未掌握</span>
-            </button>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {(["all", "known", "fuzzy", "unknown"] as const).map((item) => (
-              <Button
-                key={item}
-                variant={filter === item ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(item)}
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-3 md:grid-cols-3">
+            {(["known", "fuzzy", "unknown"] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                className="group relative overflow-hidden rounded-2xl border bg-background p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                onClick={() => setFilter(status)}
               >
-                {item === "all" ? "全部" : STATUS_LABELS[item]}
-              </Button>
+                <span
+                  className="absolute inset-y-0 left-0 w-1.5"
+                  style={{ backgroundColor: STATUS_COLORS[status] }}
+                />
+                <span className="block text-3xl font-bold tracking-tight">{counts[status]}</span>
+                <span className="mt-1 block text-sm font-medium">{STATUS_LABELS[status]}</span>
+                <span className="mt-2 block text-xs text-muted-foreground">点击查看对应词汇</span>
+              </button>
             ))}
           </div>
 
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索单词"
-          />
+          <div className="rounded-2xl border bg-gradient-to-br from-background to-muted/35 p-5 shadow-sm">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">学习状态概览</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  饼图看占比，柱状图比较数量，折线图查看近 7 天状态记录。
+                </p>
+              </div>
+              <div className="flex rounded-xl border bg-background p-1">
+                {(
+                  [
+                    ["pie", "饼状图"],
+                    ["bar", "直方图"],
+                    ["line", "折线图"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      chartMode === mode
+                        ? "bg-foreground text-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    onClick={() => setChartMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {chartMode === "pie" ? (
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={66}
+                      outerRadius={108}
+                      paddingAngle={3}
+                    >
+                      {chartData.map((item) => (
+                        <Cell key={item.status} fill={item.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                ) : chartMode === "bar" ? (
+                  <BarChart data={chartData} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.35} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Bar dataKey="value" name="词汇数量" radius={[9, 9, 0, 0]}>
+                      {chartData.map((item) => (
+                        <Cell key={item.status} fill={item.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <LineChart
+                    data={timelineData}
+                    margin={{ top: 10, right: 12, left: -18, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.35} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    {(["known", "fuzzy", "unknown"] as const).map((status) => (
+                      <Line
+                        key={status}
+                        type="monotone"
+                        dataKey={status}
+                        name={STATUS_LABELS[status]}
+                        stroke={STATUS_COLORS[status]}
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                      />
+                    ))}
+                  </LineChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-2 flex flex-wrap justify-center gap-5">
+              {chartData.map((item) => (
+                <span key={item.status} className="flex items-center gap-2 text-xs">
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  {item.name} · {item.value}
+                </span>
+              ))}
+            </div>
+          </div>
 
-          <div className="max-h-[430px] overflow-auto rounded-xl border">
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {(["all", "known", "fuzzy", "unknown"] as const).map((item) => (
+                  <Button
+                    key={item}
+                    variant={filter === item ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilter(item)}
+                  >
+                    {item === "all"
+                      ? `全部 ${counts.known + counts.fuzzy + counts.unknown}`
+                      : `${STATUS_LABELS[item]} ${counts[item]}`}
+                  </Button>
+                ))}
+              </div>
+              <Input
+                className="bg-background lg:max-w-xs"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索单词"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-[520px] overflow-auto rounded-2xl border bg-background shadow-sm">
             {words.length === 0 ? (
               <p className="p-8 text-center text-sm text-muted-foreground">暂无匹配单词</p>
             ) : (
               <ul className="divide-y">
                 {words.map(([word, status]) => (
-                  <li key={word} className="flex items-center justify-between gap-4 px-4 py-3">
-                    <div>
-                      <span className="font-medium">{word}</span>
-                      <span className="ml-3 text-xs text-muted-foreground">
+                  <li
+                    key={word}
+                    className="flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-muted/35"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-semibold">{word}</span>
+                      <span
+                        className="ml-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                        style={{ backgroundColor: STATUS_COLORS[status] }}
+                      >
                         {STATUS_LABELS[status]}
                       </span>
-                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                         {getVocabularyLevel(dictionary.get(word)?.level).label}
                       </span>
                     </div>
