@@ -351,7 +351,7 @@ options:
         speak: Sesli Okuma
       saveSuggestion:
         title: Kaydetme Önerileri
-        description: Seçim çevirisinden sonra Notebase'inize kaydedilecek kelimeler önerilir
+        description: Bir yapay zeka sağlayıcısıyla seçim çevirisinden sonra Notebase'inize kaydedilecek kelimeler önerilir
       shortcut:
         title: Selection Translation Shortcut
         description: Customize the shortcut key for translating selected text
@@ -1016,6 +1016,7 @@ saveSuggestion:
   save: Kaydet
   saved: Kaydedildi
   staleSuggestion: Bu öneri güncelliğini yitirdi
+  toggleLabel: Kaydetme önerilerini göster
 thinking:
   label: Düşünüyor
   complete: Düşünme tamamlandı
@@ -1024,7 +1025,7 @@ thinking:
 shortcutKeySelector:
   placeholder: Lütfen kısayolu girin
 subtitles:
-  loadingAiSubtitles: Yapay zeka altyazıları yükleniyor…
+  loadingAiSubtitles: Yapay zeka altyazıları yükleniyor… (tahmini 3 dk)
   requestAiSubtitles: Yapay zeka altyazısı iste (Beta)
   usingAiSubtitles: Yapay zeka altyazısı kullanılıyor
   actions:
