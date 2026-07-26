@@ -22,6 +22,11 @@ import {
 import { lookupEmbeddedDictionary } from "@/utils/vocabulary-hunter/dictionary-lookup"
 import { isEnglishVocabularyContext } from "@/utils/vocabulary-hunter/english-context"
 import {
+  eventComesFromEditableControl,
+  isVocabularyInteractiveTarget,
+  VOCABULARY_INTERACTIVE_SELECTOR,
+} from "@/utils/vocabulary-hunter/interactive-target"
+import {
   getVocabularyHunterState,
   setVocabularyHunterState,
   type VocabularyHunterState,
@@ -41,8 +46,7 @@ import {
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
 const MAX_RANGES = 1200
-const INVALID_ANCESTOR_SELECTOR =
-  "button,canvas,code,input,kbd,noscript,option,pre,script,select,style,svg,textarea,[role='button']"
+const INVALID_ANCESTOR_SELECTOR = `canvas,code,kbd,noscript,pre,script,style,svg,${VOCABULARY_INTERACTIVE_SELECTOR}`
 const INVALID_TAGS = new Set([
   "BUTTON",
   "CANVAS",
@@ -691,6 +695,7 @@ async function start(ctx: ContentScriptContext) {
   const hitTest = (event: MouseEvent) => {
     const target = event.target
     if (!(target instanceof Node)) return undefined
+    if (isVocabularyInteractiveTarget(target)) return undefined
 
     return trackedRanges
       .filter(({ range }) => {
@@ -743,12 +748,7 @@ async function start(ctx: ContentScriptContext) {
     (event) => {
       if (!state.enabled || event.composedPath().includes(host)) return
       const target = event.target
-      if (
-        target instanceof Element &&
-        target.closest("a[href],button,input,select,textarea,summary,[role='button'],[role='link']")
-      ) {
-        return
-      }
+      if (target instanceof Node && isVocabularyInteractiveTarget(target)) return
       const hit = hitTest(event)
       if (!hit) return
       event.preventDefault()
@@ -875,14 +875,7 @@ async function start(ctx: ContentScriptContext) {
   }
 
   const handleShortcut = (event: KeyboardEvent) => {
-    const target = event.target
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      (target instanceof HTMLElement && target.isContentEditable)
-    ) {
-      return
-    }
+    if (eventComesFromEditableControl(event)) return
     if (event.altKey || event.ctrlKey || event.metaKey) return
     const key = event.key.toLowerCase()
     const pageSelection = window.getSelection()
