@@ -13,6 +13,12 @@ const WXT_API_KEY_PATTERN = /^WXT_.*API_KEY/
 const ALLOWED_BUNDLED_API_KEYS = new Set(["WXT_POSTHOG_API_KEY"])
 const useLocalPackages = isLocalPackagesEnabled(process.env)
 const shouldSkipEnvValidation = process.env.WXT_SKIP_ENV_VALIDATION === "true"
+// Root of the read-frog monorepo whose source is aliased in when developing
+// with local packages. Defaults to the sibling checkout; override with
+// WXT_MONOREPO_PATH to point at a git worktree (relative or absolute).
+const monorepoRoot = process.env.WXT_MONOREPO_PATH
+  ? path.resolve(process.env.WXT_MONOREPO_PATH)
+  : path.resolve(__dirname, "../read-frog-monorepo")
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -23,14 +29,8 @@ export default defineConfig({
   // WXT top level alias - will be automatically synced to tsconfig.json paths and Vite alias
   alias: useLocalPackages
     ? {
-        "@read-frog/definitions": path.resolve(
-          __dirname,
-          "../read-frog-monorepo/packages/definitions/src",
-        ),
-        "@read-frog/api-contract": path.resolve(
-          __dirname,
-          "../read-frog-monorepo/packages/api-contract/src",
-        ),
+        "@read-frog/definitions": path.resolve(monorepoRoot, "packages/definitions/src"),
+        "@read-frog/api-contract": path.resolve(monorepoRoot, "packages/api-contract/src"),
       }
     : {},
   manifest: ({ mode, browser }) => ({
@@ -84,8 +84,24 @@ export default defineConfig({
     }),
   }),
   zip: {
-    includeSources: [".env.production"],
+    includeSources: ["**/*", ".env.production"],
     excludeSources: ["docs/**/*", "assets/**/*", "repos/**/*", "readmes/**/*"],
+  },
+  hooks: {
+    "vite:build:extendConfig": (entrypoints, viteConfig) => {
+      const entrypoint = entrypoints.length === 1 ? entrypoints[0] : undefined
+      if (entrypoint?.type !== "content-script") return
+
+      const output = viteConfig.build?.rollupOptions?.output
+      if (!output) return
+
+      for (const outputOptions of Array.isArray(output) ? output : [output]) {
+        outputOptions.assetFileNames = (assetInfo) =>
+          assetInfo.names.some((name) => name.endsWith(".css"))
+            ? `content-scripts/${entrypoint.name}.[ext]`
+            : "assets/[name]-[hash].[ext]"
+      }
+    },
   },
   dev: {
     server: {
