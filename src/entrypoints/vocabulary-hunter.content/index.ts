@@ -111,29 +111,56 @@ function safeColor(value: string, fallback: string) {
   return /^#[\da-f]{6}$/i.test(value) ? value : fallback
 }
 
-function updateHighlightStyles(style: HTMLStyleElement, state: VocabularyHunterState) {
+function highlightCss(state: VocabularyHunterState) {
   const unknownColor = safeColor(state.unknownHighlightColor, "#fb7185")
   const fuzzyColor = safeColor(state.fuzzyHighlightColor, "#fbbf24")
-  style.textContent = `
+  return `
     ::highlight(${UNKNOWN_HIGHLIGHT}) {
-      background: color-mix(in srgb, ${unknownColor} 24%, transparent);
-      text-decoration: underline dotted ${unknownColor} 2px;
-      cursor: help;
+      background-color: color-mix(in srgb, ${unknownColor} 38%, transparent);
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: ${unknownColor};
+      text-decoration-thickness: 2px;
     }
     ::highlight(${FUZZY_HIGHLIGHT}) {
-      background: color-mix(in srgb, ${fuzzyColor} 28%, transparent);
-      text-decoration: underline solid ${fuzzyColor} 2px;
-      cursor: help;
+      background-color: color-mix(in srgb, ${fuzzyColor} 34%, transparent);
+      text-decoration-line: underline;
+      text-decoration-style: solid;
+      text-decoration-color: ${fuzzyColor};
+      text-decoration-thickness: 2px;
     }
   `
 }
 
 function createHighlightStyles(state: VocabularyHunterState) {
+  if (typeof CSSStyleSheet !== "undefined" && "adoptedStyleSheets" in document) {
+    try {
+      const sheet = new CSSStyleSheet()
+      sheet.replaceSync(highlightCss(state))
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
+      return {
+        update: (nextState: VocabularyHunterState) => sheet.replaceSync(highlightCss(nextState)),
+        remove: () => {
+          document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+            (candidate) => candidate !== sheet,
+          )
+        },
+      }
+    } catch {
+      // Fall back to a style element in browsers without constructable stylesheet support.
+    }
+  }
+
   const style = document.createElement("style")
   style.dataset.readFrogVocabularyUi = ""
-  updateHighlightStyles(style, state)
+  style.textContent = highlightCss(state)
   document.documentElement.append(style)
-  return style
+  return {
+    update: (nextState: VocabularyHunterState) => {
+      style.textContent = highlightCss(nextState)
+    },
+    remove: () => style.remove(),
+  }
 }
 
 function createHoverCard() {
@@ -375,13 +402,14 @@ async function start(ctx: ContentScriptContext) {
   let hoverTimer: ReturnType<typeof setTimeout> | undefined
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
   let pendingHover: TrackedRange | null = null
+  let selectedFromTextSelection = false
   let requestSequence = 0
   const unknownHighlight = new Highlight()
   const fuzzyHighlight = new Highlight()
   CSS.highlights.set(UNKNOWN_HIGHLIGHT, unknownHighlight)
   CSS.highlights.set(FUZZY_HIGHLIGHT, fuzzyHighlight)
 
-  const style = createHighlightStyles(state)
+  const highlightStyles = createHighlightStyles(state)
   const { host, shadow } = createHoverCard()
   const card = shadow.querySelector<HTMLElement>("#card")!
   const wordLabel = shadow.querySelector<HTMLElement>("#word")!
@@ -601,10 +629,11 @@ async function start(ctx: ContentScriptContext) {
     }
   }
 
-  const showCard = (hit: TrackedRange) => {
+  const showCard = (hit: TrackedRange, source: "hover" | "selection" = "hover") => {
     clearTimeout(hoverTimer)
     pendingHover = null
     clearTimeout(hideTimer)
+    selectedFromTextSelection = source === "selection"
     const changedWord = selected?.word !== hit.word
     selected = hit
     wordLabel.textContent = hit.word
@@ -661,13 +690,16 @@ async function start(ctx: ContentScriptContext) {
       const node = walker.currentNode as Text
       if (!isTextNodeEligible(node, host)) continue
       const languageContext = findLanguageContext(node)
-      if (!languageContext) continue
-      let isEnglish = englishContextCache.get(languageContext)
-      if (isEnglish === undefined) {
-        isEnglish = isEnglishVocabularyContext(languageContext.textContent ?? "")
-        englishContextCache.set(languageContext, isEnglish)
+      let isEnglish = false
+      if (languageContext) {
+        const cachedIsEnglish = englishContextCache.get(languageContext)
+        if (cachedIsEnglish === undefined) {
+          isEnglish = isEnglishVocabularyContext(languageContext.textContent ?? "")
+          englishContextCache.set(languageContext, isEnglish)
+        } else {
+          isEnglish = cachedIsEnglish
+        }
       }
-      if (!isEnglish) continue
       for (const occurrence of findCandidateWords(
         node.data,
         state.minimumLength,
@@ -676,6 +708,8 @@ async function start(ctx: ContentScriptContext) {
         new Set(state.enabledLevels),
       )) {
         if (trackedRanges.length >= MAX_RANGES) break
+        const explicitStatus = state.statuses[occurrence.word]
+        if (!isEnglish && explicitStatus !== "unknown" && explicitStatus !== "fuzzy") continue
         if (isUsernameMention(node, occurrence.start)) continue
         const range = document.createRange()
         range.setStart(node, occurrence.start)
@@ -729,6 +763,10 @@ async function start(ctx: ContentScriptContext) {
       }
       const selection = window.getSelection()
       if (selection && !selection.isCollapsed) {
+        if (selectedFromTextSelection && card.classList.contains("open")) {
+          clearTimeout(hideTimer)
+          return
+        }
         hideCardSoon()
         return
       }
@@ -779,11 +817,14 @@ async function start(ctx: ContentScriptContext) {
       return
     }
     const wordInfo = vocabularyDictionary?.get(normalizedWord)
-    showCard({
-      range: range.cloneRange(),
-      word: wordInfo?.lemma ?? normalizedWord,
-      level: wordInfo?.level,
-    })
+    showCard(
+      {
+        range: range.cloneRange(),
+        word: wordInfo?.lemma ?? normalizedWord,
+        level: wordInfo?.level,
+      },
+      "selection",
+    )
   }
   document.addEventListener("mouseup", showSelectedWord, true)
 
@@ -836,7 +877,12 @@ async function start(ctx: ContentScriptContext) {
     })
   })
 
-  const markWord = async (word: string, status: VocabularyStatus) => {
+  const markWord = async (
+    word: string,
+    status: VocabularyStatus,
+    preferredRange?: Range,
+    level?: VocabularyLevel,
+  ) => {
     state = {
       ...state,
       statuses: {
@@ -857,8 +903,24 @@ async function start(ctx: ContentScriptContext) {
     })
     trackedRanges = trackedRanges.filter((item) => item.word !== word)
 
-    await save()
     refresh()
+    if (
+      preferredRange?.startContainer.isConnected &&
+      (status === "unknown" || status === "fuzzy") &&
+      !trackedRanges.some(
+        (item) =>
+          item.word === word &&
+          item.range.startContainer === preferredRange.startContainer &&
+          item.range.startOffset === preferredRange.startOffset &&
+          item.range.endContainer === preferredRange.endContainer &&
+          item.range.endOffset === preferredRange.endOffset,
+      )
+    ) {
+      trackedRanges.push({ range: preferredRange, word, level })
+      if (status === "fuzzy") fuzzyHighlight.add(preferredRange)
+      else unknownHighlight.add(preferredRange)
+    }
+    await save()
     if (vocabularyDictionary) {
       void syncKnownWord(word, status === "known", vocabularyDictionary)
     }
@@ -868,10 +930,14 @@ async function start(ctx: ContentScriptContext) {
   const markSelected = async (status: VocabularyStatus) => {
     if (!selected) return
     const selectedWord = selected.word
+    const selectedRange = selected.range.cloneRange()
+    const selectedLevel = selected.level
     card.classList.remove("open")
     selected = null
+    selectedFromTextSelection = false
+    window.getSelection()?.removeAllRanges()
 
-    await markWord(selectedWord, status)
+    await markWord(selectedWord, status, selectedRange, selectedLevel)
   }
 
   const handleShortcut = (event: KeyboardEvent) => {
@@ -883,11 +949,17 @@ async function start(ctx: ContentScriptContext) {
       const normalizedWord = normalizeSelectedWord(pageSelection.toString())
       if (!normalizedWord) return
       const word = vocabularyDictionary?.get(normalizedWord)?.lemma ?? normalizedWord
+      const selectedRange = pageSelection.rangeCount
+        ? pageSelection.getRangeAt(0).cloneRange()
+        : null
+      const selectedLevel = vocabularyDictionary?.get(normalizedWord)?.level
       event.preventDefault()
       event.stopImmediatePropagation()
       card.classList.remove("open")
       selected = null
-      void markWord(word, "unknown")
+      selectedFromTextSelection = false
+      pageSelection.removeAllRanges()
+      void markWord(word, "unknown", selectedRange ?? undefined, selectedLevel)
       return
     }
     if (!selected || !card.classList.contains("open")) return
@@ -954,6 +1026,7 @@ async function start(ctx: ContentScriptContext) {
     if (!action) return
     if (action === "close") {
       card.classList.remove("open")
+      selectedFromTextSelection = false
       return
     }
     if (!selected) return
@@ -969,7 +1042,7 @@ async function start(ctx: ContentScriptContext) {
   refresh()
   const unwatchState = watchVocabularyHunterState((nextState) => {
     state = nextState
-    updateHighlightStyles(style, state)
+    highlightStyles.update(state)
     applyDictionaryOrder()
     refresh()
   })
@@ -989,7 +1062,7 @@ async function start(ctx: ContentScriptContext) {
     clearHighlights()
     CSS.highlights.delete(UNKNOWN_HIGHLIGHT)
     CSS.highlights.delete(FUZZY_HIGHLIGHT)
-    style.remove()
+    highlightStyles.remove()
     host.remove()
   })
 }

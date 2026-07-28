@@ -137,13 +137,16 @@ export function findCandidateWords(
     const word = normalizeWord(segment.segment)
     const wordInfo = dictionary?.get(word)
     const lemma = wordInfo?.lemma ?? word
+    const status = statuses[lemma]
+    const isExplicitLearningWord = status === "unknown" || status === "fuzzy"
     if (
-      word.length < minimumLength ||
-      (!dictionary && BASIC_WORDS.has(word)) ||
-      statuses[lemma] === "known" ||
-      (wordInfo && enabledLevels && !enabledLevels.has(wordInfo.level)) ||
-      (dictionary && !wordInfo) ||
-      !/^[a-z]+(?:'[a-z]+)?$/i.test(word)
+      !/^[a-z]+(?:'[a-z]+)?$/i.test(word) ||
+      status === "known" ||
+      (!isExplicitLearningWord &&
+        (word.length < minimumLength ||
+          (!dictionary && BASIC_WORDS.has(word)) ||
+          (wordInfo && enabledLevels && !enabledLevels.has(wordInfo.level)) ||
+          (dictionary && !wordInfo)))
     ) {
       continue
     }

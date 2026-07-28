@@ -28,4 +28,27 @@ describe("vocabulary hunter candidates", () => {
       "terminology",
     ])
   })
+
+  it("keeps explicitly marked learning words even when automatic filters exclude them", () => {
+    const dictionary = new Map([
+      [
+        "remembered",
+        {
+          lemma: "remember",
+          level: "g" as const,
+          index: 1,
+        },
+      ],
+    ])
+
+    expect(
+      findCandidateWords(
+        "Remembered customterm.",
+        12,
+        { remember: "unknown", customterm: "fuzzy" },
+        dictionary,
+        new Set(["p"] as const),
+      ).map(({ word }) => word),
+    ).toEqual(["remember", "customterm"])
+  })
 })
