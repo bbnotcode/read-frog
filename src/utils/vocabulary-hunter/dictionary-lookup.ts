@@ -59,9 +59,12 @@ function restoreGoogleFragments(document: Document, html: string) {
   const matcher = /\(function\(\)\{window\.jsl\.dh\('([^']+)','([^']+)'\);\}\)\(\);/g
   let match: RegExpExecArray | null
   while ((match = matcher.exec(html))) {
-    const element = document.getElementById(match[1])
+    const elementId = match[1]
+    const fragmentHtml = match[2]
+    if (!elementId || fragmentHtml === undefined) continue
+    const element = document.getElementById(elementId)
     if (!element) continue
-    element.innerHTML = match[2]
+    element.innerHTML = fragmentHtml
       .replace(/\\x([\da-f]{2})/gi, (_value, code: string) =>
         String.fromCharCode(Number.parseInt(code, 16)),
       )

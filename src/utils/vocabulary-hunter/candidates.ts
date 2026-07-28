@@ -115,8 +115,9 @@ export function normalizeSelectedWord(selection: string) {
   const match = selection
     .trim()
     .match(/^[\s"'“”‘’()[\]{},.!?:;]*([a-z]+(?:[’'][a-z]+)?)[\s"'“”‘’()[\]{},.!?:;]*$/i)
-  if (!match) return undefined
-  const word = normalizeWord(match[1])
+  const selectedWord = match?.[1]
+  if (!selectedWord) return undefined
+  const word = normalizeWord(selectedWord)
   return /^[a-z]+(?:'[a-z]+)?$/i.test(word) ? word : undefined
 }
 
