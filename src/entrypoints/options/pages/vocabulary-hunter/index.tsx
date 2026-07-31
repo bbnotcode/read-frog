@@ -1,20 +1,6 @@
 import type { VocabularyStatus, VocabularyWordInfo } from "@/utils/vocabulary-hunter/candidates"
 import type { VocabularyDictionary } from "@/utils/vocabulary-hunter/storage"
 import { useEffect, useMemo, useRef, useState } from "react"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
 import { Button } from "@/components/ui/base-ui/button"
 import { Input } from "@/components/ui/base-ui/input"
 import { Switch } from "@/components/ui/base-ui/switch"
@@ -68,6 +54,139 @@ const DICTIONARY_LABELS: Record<VocabularyDictionary, string> = {
   haici: "海词词典",
   google: "Google 词典",
   ai: "ReadFrog AI",
+}
+
+type ChartDatum = {
+  status: VocabularyStatus
+  name: string
+  value: number
+  color: string
+}
+
+type TimelineDatum = {
+  date: string
+  known: number
+  fuzzy: number
+  unknown: number
+}
+
+function VocabularyChart({
+  mode,
+  chartData,
+  timelineData,
+}: {
+  mode: ChartMode
+  chartData: ChartDatum[]
+  timelineData: TimelineDatum[]
+}) {
+  if (mode === "pie") {
+    const total = chartData.reduce((sum, item) => sum + item.value, 0)
+    let angle = 0
+    const segments = chartData.map((item) => {
+      const start = angle
+      angle += total > 0 ? (item.value / total) * 360 : 0
+      return `${item.color} ${start}deg ${angle}deg`
+    })
+
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div
+          role="img"
+          aria-label={chartData.map((item) => `${item.name} ${item.value}`).join("，")}
+          className="relative size-56 rounded-full"
+          style={{
+            background:
+              total > 0 ? `conic-gradient(${segments.join(", ")})` : "var(--color-muted, #e5e7eb)",
+          }}
+        >
+          <div className="absolute inset-14 flex flex-col items-center justify-center rounded-full bg-background shadow-inner">
+            <span className="text-3xl font-bold">{total}</span>
+            <span className="text-xs text-muted-foreground">总词汇</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === "bar") {
+    const maximum = Math.max(1, ...chartData.map((item) => item.value))
+    return (
+      <div className="flex h-full items-end justify-center gap-8 border-b px-6 pt-5">
+        {chartData.map((item) => (
+          <div
+            key={item.status}
+            className="flex h-full w-24 flex-col items-center justify-end gap-2"
+          >
+            <span className="text-sm font-semibold">{item.value}</span>
+            <div
+              className="min-h-1 w-full rounded-t-xl transition-[height]"
+              style={{
+                height: `${Math.max(2, (item.value / maximum) * 82)}%`,
+                backgroundColor: item.color,
+              }}
+            />
+            <span className="pb-2 text-xs text-muted-foreground">{item.name}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const statuses = ["known", "fuzzy", "unknown"] as const
+  const maximum = Math.max(
+    1,
+    ...timelineData.flatMap((item) => statuses.map((status) => item[status])),
+  )
+  const pointsFor = (status: (typeof statuses)[number]) =>
+    timelineData
+      .map((item, index) => {
+        const x = timelineData.length === 1 ? 50 : (index / (timelineData.length - 1)) * 100
+        const y = 90 - (item[status] / maximum) * 80
+        return `${x},${y}`
+      })
+      .join(" ")
+
+  return (
+    <div className="flex h-full flex-col pt-2">
+      <svg
+        role="img"
+        aria-label="最近七天词汇状态折线图"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="min-h-0 flex-1 overflow-visible"
+      >
+        {[10, 30, 50, 70, 90].map((y) => (
+          <line
+            key={y}
+            x1="0"
+            x2="100"
+            y1={y}
+            y2={y}
+            vectorEffect="non-scaling-stroke"
+            className="stroke-border"
+            strokeDasharray="4 4"
+          />
+        ))}
+        {statuses.map((status) => (
+          <polyline
+            key={status}
+            points={pointsFor(status)}
+            fill="none"
+            stroke={STATUS_COLORS[status]}
+            strokeWidth="3"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+        {timelineData.map((item) => (
+          <span key={item.date}>{item.date}</span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function VocabularyHunterPage() {
@@ -320,7 +439,11 @@ export function VocabularyHunterPage() {
   }
 
   return (
-    <PageLayout title="生词猎手" innerClassName="flex flex-col px-8">
+    <PageLayout
+      title="生词猎手"
+      description="在网页中识别、标注和复习你的英语词汇，并同步个人学习状态。"
+      innerClassName="flex flex-col px-8"
+    >
       <ConfigCard
         layout="stacked"
         title="网页生词标注"
@@ -640,60 +763,7 @@ export function VocabularyHunterPage() {
               </div>
             </div>
             <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                {chartMode === "pie" ? (
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={66}
-                      outerRadius={108}
-                      paddingAngle={3}
-                    >
-                      {chartData.map((item) => (
-                        <Cell key={item.status} fill={item.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                ) : chartMode === "bar" ? (
-                  <BarChart data={chartData} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.35} />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    <Bar dataKey="value" name="词汇数量" radius={[9, 9, 0, 0]}>
-                      {chartData.map((item) => (
-                        <Cell key={item.status} fill={item.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                ) : (
-                  <LineChart
-                    data={timelineData}
-                    margin={{ top: 10, right: 12, left: -18, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.35} />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    {(["known", "fuzzy", "unknown"] as const).map((status) => (
-                      <Line
-                        key={status}
-                        type="monotone"
-                        dataKey={status}
-                        name={STATUS_LABELS[status]}
-                        stroke={STATUS_COLORS[status]}
-                        strokeWidth={3}
-                        dot={{ r: 3 }}
-                      />
-                    ))}
-                  </LineChart>
-                )}
-              </ResponsiveContainer>
+              <VocabularyChart mode={chartMode} chartData={chartData} timelineData={timelineData} />
             </div>
             <div className="mt-2 flex flex-wrap justify-center gap-5">
               {chartData.map((item) => (
