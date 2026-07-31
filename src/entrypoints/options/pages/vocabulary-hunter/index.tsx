@@ -41,8 +41,8 @@ import {
   syncKnownWords,
   syncWordsToWordHunterGist,
 } from "@/utils/vocabulary-hunter/sync"
-import { ConfigCard } from "../../components/config-card"
 import { PageLayout } from "../../components/page-layout"
+import { ConfigCard } from "./config-card"
 
 type StatusFilter = "all" | "known" | "fuzzy" | "unknown"
 type ChartMode = "pie" | "bar" | "line"
