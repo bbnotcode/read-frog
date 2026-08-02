@@ -56,13 +56,16 @@ popup:
   aiSmartContextDescription: Sử dụng ngữ cảnh trang web để cải thiện chất lượng dịch. Yêu cầu nhà cung cấp dịch LLM.
   more:
     title: Thêm
-    translationHub: Trung tâm Dịch thuật
+    help: Trợ giúp
+    tutorial: Hướng dẫn
+    emailUs: Gửi email cho chúng tôi
+    featureRequest: Đề xuất tính năng
+    bugReport: Báo lỗi
+    community: Cộng đồng
     joinDiscord: Tham gia Discord
     joinWechat: Tham gia nhóm WeChat
     starGithub: Đánh dấu sao trên Github
     rateUs: Đánh giá chúng tôi
-    ebook: Trình đọc sách điện tử bên thứ ba
-    tutorial: Hướng dẫn
 errorRecovery:
   title: Đã xảy ra sự cố
   description: Chế độ khôi phục đang hoạt động. Bạn có thể xuất cài đặt hiện tại để sao lưu, sau đó đặt lại cài đặt và thử lại.
@@ -94,20 +97,30 @@ options:
     translationHub: Trung tâm Dịch thuật
   product:
     roadmap: Lộ trình
-  contactUs:
-    title: Liên hệ
-    pageDescription: Cho chúng tôi biết nên làm gì tiếp theo, báo lỗi, hoặc chỉ để chào hỏi.
+  helpAndCommunity:
+    title: Trợ giúp và cộng đồng
+    pageDescription: Tìm hiểu cách dùng Read Frog, nhờ nhóm hỗ trợ, hoặc tham gia cộng đồng cùng những người dùng khác.
+    help:
+      title: Trợ giúp
+    tutorial:
+      title: Hướng dẫn
+      description: Đọc tài liệu để biết cách sử dụng Read Frog
+    email:
+      title: Gửi email cho chúng tôi
+      description: Liên hệ trực tiếp với nhóm qua contact@readfrog.app
     featureRequest:
       title: Đề xuất tính năng
       description: Đề xuất ý tưởng và bình chọn cho tính năng nhóm sẽ làm tiếp theo
     bugReport:
       title: Báo lỗi
       description: Mở phiếu hỗ trợ và theo dõi cho đến khi được khắc phục
-    email:
-      title: Gửi email cho chúng tôi
-      description: Liên hệ trực tiếp với nhóm qua contact@readfrog.app
+    community:
+      title: Cộng đồng
+    discord:
+      title: Discord
+      description: Trò chuyện trực tiếp với nhóm và những người dùng khác
     wechat:
-      title: WeChat
+      title: Nhóm WeChat
       description: Quét mã QR để tham gia nhóm thảo luận trên WeChat
       qrCodeAlt: Mã QR WeChat
   apiProviders:
@@ -293,6 +306,8 @@ options:
         auto: Tự động (theo trình duyệt)
     extensionActivation:
       title: Kích hoạt tiện ích mở rộng
+      description: Chạy ở mọi nơi trừ các trang bạn liệt kê, hoặc chỉ chạy trên các trang bạn liệt kê
+      manageSites: Quản lý trang web
       mode:
         title: Chế độ kích hoạt
         description: Sử dụng chế độ danh sách đen để tắt tiện ích trên các trang web cụ thể, hoặc chế độ danh sách trắng để giới hạn chỉ các trang web cụ thể.
@@ -720,7 +735,7 @@ options:
             tooLong: CSS quá dài
             saved: Tất cả thay đổi đã được lưu
     personalizedPrompts:
-      title: Prompt cá nhân hóa
+      title: Lời nhắc trang tùy chỉnh
       description: Tùy chỉnh các loại Prompt khác nhau cho phép bạn tự điều chỉnh loại Prompt trong quá trình dịch. Prompt là văn bản mà người dùng gửi cho LLM.
       managePrompts: Quản lý prompt
       communityPrompts: Nhận hoặc chia sẻ prompt từ cộng đồng
@@ -755,6 +770,8 @@ options:
         cancel: Hủy
     translationControl:
       title: Kiểm soát dịch
+      description: Những gì tự động dịch, những gì không bao giờ dịch và những gì bị bỏ qua
+      manageControls: Quản lý kiểm soát
       autoTranslateWebsite:
         title: Tự động dịch theo trang web
         description: Các trang bắt đầu dịch ngay khi mở
@@ -784,6 +801,8 @@ options:
         error: Giá trị phải từ $1 đến $2
     translationQueue:
       title: Hàng đợi dịch
+      description: Yêu cầu gửi đi nhanh đến mức nào, mỗi yêu cầu mang bao nhiêu văn bản và dịch trước người đọc bao xa
+      manageQueue: Quản lý hàng đợi
       requestQueueConfig:
         title: Tốc độ dịch
         capacity:
@@ -926,6 +945,8 @@ options:
           videoSummary: Tóm tắt video (yêu cầu ngữ cảnh thông minh AI)
     subtitlesQueue:
       title: Hàng đợi phụ đề
+      description: Yêu cầu phụ đề gửi đi nhanh đến mức nào và mỗi yêu cầu mang bao nhiêu dòng
+      manageQueue: Quản lý hàng đợi
       requestQueueConfig:
         title: Tốc độ dịch
         capacity:
@@ -1068,6 +1089,7 @@ subtitles:
     downloadSource: Tải phụ đề gốc
   state:
     loading: Read Frog đang tải phụ đề
+    translating: Đang dịch…
     error: Đã xảy ra lỗi
   errors:
     http429: 429 Đã gửi quá nhiều yêu cầu đến API phụ đề Youtube, vui lòng thử lại sau

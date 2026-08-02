@@ -56,13 +56,16 @@ popup:
   aiSmartContextDescription: 結合網頁前後文提升翻譯品質。需要設定 LLM 翻譯服務提供者。
   more:
     title: 更多
-    translationHub: 翻譯中心
+    help: 說明
+    tutorial: 使用教學
+    emailUs: 電子郵件聯絡
+    featureRequest: 功能建議
+    bugReport: 回報問題
+    community: 社群
     joinDiscord: 加入 Discord
     joinWechat: 加入微信群
     starGithub: 在 GitHub 加星
     rateUs: 給予好評
-    ebook: 第三方電子書閱讀器
-    tutorial: 使用教學
 errorRecovery:
   title: 應用程式發生異常
   description: 已進入復原模式。可先匯出目前設定作為備份，重設設定後再重試。
@@ -94,20 +97,30 @@ options:
     translationHub: 翻譯中心
   product:
     roadmap: 產品路線圖
-  contactUs:
-    title: 聯絡我們
-    pageDescription: 告訴我們接下來該做什麼、回報遇到的問題，或只是打聲招呼。
+  helpAndCommunity:
+    title: 說明與社群
+    pageDescription: 了解怎麼使用陪讀蛙、向團隊尋求協助，或加入社群和其他使用者交流。
+    help:
+      title: 說明
+    tutorial:
+      title: 使用教學
+      description: 閱讀文件，了解怎麼使用陪讀蛙
+    email:
+      title: 電子郵件聯絡
+      description: 透過 contact@readfrog.app 直接聯絡團隊
     featureRequest:
       title: 功能建議
       description: 提出想法，並為團隊接下來要做的功能投票
     bugReport:
       title: 回報問題
       description: 建立支援工單，並追蹤到問題解決為止
-    email:
-      title: 電子郵件聯絡
-      description: 透過 contact@readfrog.app 直接聯絡團隊
+    community:
+      title: 社群
+    discord:
+      title: Discord
+      description: 與團隊和其他使用者即時交流
     wechat:
-      title: 微信
+      title: 微信群
       description: 掃描 QR code 進入微信討論群
       qrCodeAlt: 微信 QR code
   apiProviders:
@@ -294,6 +307,8 @@ options:
         auto: 自動（跟隨瀏覽器）
     extensionActivation:
       title: 擴充功能啟動
+      description: 在清單之外的所有網站執行，還是只在清單內的網站執行
+      manageSites: 管理網站
       mode:
         title: 啟動模式
         description: 使用封鎖清單模式可在特定網站停用擴充功能；使用允許清單模式則只在指定網站啟用擴充功能。
@@ -836,7 +851,7 @@ options:
             tooLong: CSS 過長
             saved: 所有變更已儲存
     personalizedPrompts:
-      title: 個人化提示詞
+      title: 自訂網頁提示詞
       description: 自訂不同類型的提示詞，可以在翻譯時自行調整提示詞類型。提示詞表示以使用者身分傳送給 LLM 的文字。
       managePrompts: 管理提示詞
       communityPrompts: 取得或分享社群提示詞
@@ -871,6 +886,8 @@ options:
         cancel: 取消
     translationControl:
       title: 翻譯控制
+      description: 哪些網頁會自動翻譯、哪些永不翻譯、哪些內容會被略過
+      manageControls: 管理控制規則
       autoTranslateWebsite:
         title: 依網站自動翻譯
         description: 開啟後就開始翻譯的網站
@@ -900,6 +917,8 @@ options:
         error: 數值必須在 $1 到 $2 之間
     translationQueue:
       title: 翻譯佇列
+      description: 請求發出的速度、每個請求承載的文字量，以及提前於閱讀位置多遠開始翻譯
+      manageQueue: 管理佇列
       requestQueueConfig:
         title: 翻譯速率
         capacity:
@@ -1042,6 +1061,8 @@ options:
           videoSummary: 影片摘要（需啟用 AI 智慧上下文）
     subtitlesQueue:
       title: 字幕佇列
+      description: 字幕請求發出的速度，以及每個請求承載的字幕行數
+      manageQueue: 管理佇列
       requestQueueConfig:
         title: 翻譯速率
         capacity:
@@ -1184,6 +1205,7 @@ subtitles:
     downloadSource: 下載原始字幕
   state:
     loading: 陪讀蛙字幕載入中
+    translating: 翻譯中…
     error: 發生錯誤
   errors:
     http429: 429 YouTube 字幕 API 請求次數過多，請稍後再試

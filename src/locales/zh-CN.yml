@@ -56,13 +56,16 @@ popup:
   aiSmartContextDescription: 结合网页上下文提升翻译效果。需要配置 LLM 翻译服务商。
   more:
     title: 更多
-    translationHub: 翻译中心
+    help: 帮助
+    tutorial: 使用教程
+    emailUs: 邮件联系
+    featureRequest: 功能建议
+    bugReport: 报告问题
+    community: 社区
     joinDiscord: 加入 Discord
     joinWechat: 加入微信群
     starGithub: Github 加星
     rateUs: 好评支持
-    ebook: 第三方电子书阅读器
-    tutorial: 使用教程
 errorRecovery:
   title: 应用发生异常
   description: 已进入恢复模式。你可以先导出当前设置作为备份，再重置设置后重试。
@@ -94,20 +97,30 @@ options:
     translationHub: 翻译中心
   product:
     roadmap: 路线图
-  contactUs:
-    title: 联系我们
-    pageDescription: 告诉我们接下来该做什么、反馈遇到的问题，或者只是打个招呼。
+  helpAndCommunity:
+    title: 帮助与社区
+    pageDescription: 了解怎么使用陪读蛙、向团队寻求帮助，或者加入社区和其他用户交流。
+    help:
+      title: 帮助
+    tutorial:
+      title: 使用教程
+      description: 阅读文档，了解怎么使用陪读蛙
+    email:
+      title: 邮件联系
+      description: 通过 contact@readfrog.app 直接联系团队
     featureRequest:
       title: 功能建议
       description: 提出想法，并为团队接下来要做的功能投票
     bugReport:
       title: 报告问题
       description: 提交工单，并跟进直到问题解决
-    email:
-      title: 邮件联系
-      description: 通过 contact@readfrog.app 直接联系团队
+    community:
+      title: 社区
+    discord:
+      title: Discord
+      description: 与团队和其他用户实时交流
     wechat:
-      title: 微信
+      title: 微信群
       description: 扫描二维码进入微信讨论群
       qrCodeAlt: 微信二维码
   apiProviders:
@@ -294,6 +307,8 @@ options:
         auto: 自动（跟随浏览器）
     extensionActivation:
       title: 扩展激活
+      description: 在列表之外的所有网站运行，还是只在列表内的网站运行
+      manageSites: 管理网站
       mode:
         title: 激活模式
         description: 使用黑名单模式可以在特定网站上禁用扩展，或使用白名单模式限制扩展仅在特定网站上运行。
@@ -836,7 +851,7 @@ options:
             tooLong: CSS 过长
             saved: 所有更改已保存
     personalizedPrompts:
-      title: 个性化 Prompt
+      title: 自定义网页提示词
       description: 自定义不同类型的 Prompt，可以在翻译时自行调整 Prompt 类型。Prompt 表示以用户身份发送给 LLM 的文本。
       managePrompts: 管理 Prompt
       communityPrompts: 获取或分享社区 Prompt
@@ -871,6 +886,8 @@ options:
         cancel: 取消
     translationControl:
       title: 翻译控制
+      description: 哪些网页会自动翻译、哪些永不翻译、哪些内容会被跳过
+      manageControls: 管理控制规则
       autoTranslateWebsite:
         title: 基于网站自动翻译
         description: 打开后就开始翻译的网站
@@ -900,6 +917,8 @@ options:
         error: 数值必须在 $1 到 $2 之间
     translationQueue:
       title: 翻译队列
+      description: 请求发出的速度、每个请求承载的文本量，以及提前于阅读位置多远开始翻译
+      manageQueue: 管理队列
       requestQueueConfig:
         title: 翻译速率
         capacity:
@@ -1042,6 +1061,8 @@ options:
           videoSummary: 视频摘要（需启用 AI 智能上下文）
     subtitlesQueue:
       title: 字幕队列
+      description: 字幕请求发出的速度，以及每个请求承载的字幕行数
+      manageQueue: 管理队列
       requestQueueConfig:
         title: 翻译速率
         capacity:
@@ -1184,6 +1205,7 @@ subtitles:
     downloadSource: 下载原字幕
   state:
     loading: Read Frog 字幕加载中
+    translating: 翻译中…
     error: 发生错误
   errors:
     http429: 429 youtube 字幕接口请求次数过多，请稍后再试

@@ -56,13 +56,16 @@ popup:
   aiSmartContextDescription: Uses webpage context to improve translation quality. Requires LLM translation provider.
   more:
     title: More
-    translationHub: Translation Hub
+    help: Help
+    tutorial: Tutorial
+    emailUs: Email us
+    featureRequest: Feature request
+    bugReport: Report a bug
+    community: Community
     joinDiscord: Join Discord
     joinWechat: Join WeChat Group
     starGithub: Star on Github
     rateUs: Rate Us
-    ebook: Third-party E-book Reader
-    tutorial: Tutorial
 errorRecovery:
   title: Something went wrong
   description: Recovery mode is active. You can export your current settings as a backup, then reset settings and try again.
@@ -94,20 +97,30 @@ options:
     translationHub: Translation Hub
   product:
     roadmap: Roadmap
-  contactUs:
-    title: Contact Us
-    pageDescription: Tell us what to build next, report something that broke, or just say hello.
+  helpAndCommunity:
+    title: Help & Community
+    pageDescription: Learn how to use Read Frog, get help from the team, or join other users in the community.
+    help:
+      title: Help
+    tutorial:
+      title: Tutorial
+      description: Read the docs and learn how to use Read Frog
+    email:
+      title: Email us
+      description: Reach the team directly at contact@readfrog.app
     featureRequest:
       title: Feature request
       description: Suggest an idea and vote on what the team builds next
     bugReport:
       title: Report a bug
       description: Open a support ticket and follow it until it is fixed
-    email:
-      title: Email us
-      description: Reach the team directly at contact@readfrog.app
+    community:
+      title: Community
+    discord:
+      title: Discord
+      description: Chat with the team and other users in real time
     wechat:
-      title: WeChat
+      title: WeChat group
       description: Scan the QR code to join the WeChat discussion group
       qrCodeAlt: WeChat QR code
   apiProviders:
@@ -294,6 +307,8 @@ options:
         auto: Auto (follow browser)
     extensionActivation:
       title: Extension activation
+      description: Whether Read Frog runs everywhere except the sites you list, or only on the sites you list
+      manageSites: Manage sites
       mode:
         title: Activation mode
         description: Use blacklist mode to disable the extension on specific sites, or whitelist mode to limit it to specific sites only.
@@ -836,7 +851,7 @@ options:
             tooLong: CSS is too long
             saved: All changes saved
     personalizedPrompts:
-      title: Personalized prompts
+      title: Customize page prompts
       description: Customizing different types of Prompts allows you to adjust the Prompt type yourself during translation. A Prompt represents the text that the user sends to the LLM.
       managePrompts: Manage prompts
       communityPrompts: Get or share prompts from community
@@ -871,6 +886,8 @@ options:
         cancel: Cancel
     translationControl:
       title: Translation control
+      description: What starts translating on its own, what never does, and what gets skipped
+      manageControls: Manage controls
       autoTranslateWebsite:
         title: Auto translate based on website
         description: Sites that start translating as soon as they open
@@ -900,6 +917,8 @@ options:
         error: Value must be between $1 and $2
     translationQueue:
       title: Translation queue
+      description: How fast requests go out, how much text each carries, and how far ahead of the reader they run
+      manageQueue: Manage queue
       requestQueueConfig:
         title: Translation rate
         capacity:
@@ -1042,6 +1061,8 @@ options:
           videoSummary: Video summary (requires AI smart context)
     subtitlesQueue:
       title: Subtitle queue
+      description: How fast subtitle requests go out and how many lines each carries
+      manageQueue: Manage queue
       requestQueueConfig:
         title: Translation rate
         capacity:
@@ -1184,6 +1205,7 @@ subtitles:
     downloadSource: Download source subtitles
   state:
     loading: Read Frog loading captions
+    translating: Translating…
     error: Error occurred
   errors:
     http429: 429 Too many requests to youtube subtitle API, please try again later

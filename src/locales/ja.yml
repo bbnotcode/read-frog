@@ -56,13 +56,16 @@ popup:
   aiSmartContextDescription: ウェブページのコンテキストを使用して翻訳品質を向上させます。LLM翻訳プロバイダーが必要です。
   more:
     title: その他
-    translationHub: 翻訳ハブ
+    help: ヘルプ
+    tutorial: 使い方ガイド
+    emailUs: メールで問い合わせ
+    featureRequest: 機能リクエスト
+    bugReport: 不具合を報告
+    community: コミュニティ
     joinDiscord: Discordに参加
     joinWechat: WeChatグループに参加
     starGithub: Githubでスター
     rateUs: レビューを書く
-    ebook: サードパーティ電子書籍リーダー
-    tutorial: 使い方ガイド
 errorRecovery:
   title: 問題が発生しました
   description: 復旧モードが有効です。現在の設定をバックアップとしてエクスポートし、設定をリセットして再試行してください。
@@ -94,20 +97,30 @@ options:
     translationHub: 翻訳ハブ
   product:
     roadmap: ロードマップ
-  contactUs:
-    title: お問い合わせ
-    pageDescription: 次に作るべきものや、うまく動かないことを教えてください。
+  helpAndCommunity:
+    title: ヘルプとコミュニティ
+    pageDescription: Read Frog の使い方を学び、チームに相談したり、コミュニティで他のユーザーと交流したりできます。
+    help:
+      title: ヘルプ
+    tutorial:
+      title: 使い方ガイド
+      description: ドキュメントを読んで Read Frog の使い方を学べます
+    email:
+      title: メールで問い合わせ
+      description: contact@readfrog.app からチームに直接連絡できます
     featureRequest:
       title: 機能リクエスト
       description: アイデアを提案し、次に開発する機能に投票できます
     bugReport:
       title: 不具合を報告
       description: サポートチケットを作成し、解決までの状況を追えます
-    email:
-      title: メールで問い合わせ
-      description: contact@readfrog.app からチームに直接連絡できます
+    community:
+      title: コミュニティ
+    discord:
+      title: Discord
+      description: チームや他のユーザーとリアルタイムで交流できます
     wechat:
-      title: WeChat
+      title: WeChat グループ
       description: QR コードをスキャンして WeChat のディスカッショングループに参加
       qrCodeAlt: WeChat QR コード
   apiProviders:
@@ -293,6 +306,8 @@ options:
         auto: 自動（ブラウザに従う）
     extensionActivation:
       title: 拡張機能の有効化
+      description: リストに登録したサイト以外のすべてで動作させるか、登録したサイトでのみ動作させるか
+      manageSites: サイトを管理
       mode:
         title: 有効化モード
         description: ブラックリストモードを使用して特定のサイトで拡張機能を無効にするか、ホワイトリストモードを使用して特定のサイトのみに制限できます。
@@ -720,7 +735,7 @@ options:
             tooLong: CSSが長すぎます
             saved: すべての変更が保存されました
     personalizedPrompts:
-      title: 個人化プロンプト
+      title: カスタムページプロンプト
       description: 異なるタイプのプロンプトをカスタマイズすることで、翻訳時にプロンプトタイプを自ら調整できます。プロンプトとは、ユーザーがLLMに送信するテキストを指します。
       managePrompts: プロンプトを管理
       communityPrompts: コミュニティからプロンプトを取得・共有
@@ -755,6 +770,8 @@ options:
         cancel: キャンセル
     translationControl:
       title: 翻訳の制御
+      description: 自動的に翻訳されるもの、決して翻訳されないもの、スキップされるもの
+      manageControls: 制御を管理
       autoTranslateWebsite:
         title: ウェブサイトに基づく自動翻訳
         description: 開いた時点で翻訳を始めるサイト
@@ -784,6 +801,8 @@ options:
         error: 値は $1 から $2 の間である必要があります
     translationQueue:
       title: 翻訳キュー
+      description: リクエストを送る速さ、1回あたりのテキスト量、読者よりどれだけ先を翻訳するか
+      manageQueue: キューを管理
       requestQueueConfig:
         title: 翻訳速度
         capacity:
@@ -926,6 +945,8 @@ options:
           videoSummary: 動画要約（AI スマートコンテキストが必要）
     subtitlesQueue:
       title: 字幕キュー
+      description: 字幕リクエストを送る速さと、1回あたりの行数
+      manageQueue: キューを管理
       requestQueueConfig:
         title: 翻訳速度
         capacity:
@@ -1068,6 +1089,7 @@ subtitles:
     downloadSource: 元字幕をダウンロード
   state:
     loading: Read Frog 字幕読み込み中
+    translating: 翻訳中…
     error: エラーが発生しました
   errors:
     http429: 429 YouTube字幕APIへのリクエストが多すぎます。しばらくしてから再試行してください
