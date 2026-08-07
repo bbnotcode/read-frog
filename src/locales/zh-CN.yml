@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: 搜索设置...
     noResults: 未找到设置
+    open: 搜索设置
   sidebar:
+    toggle: 切换侧边栏
     settings: 设置
     features: 功能
     product: 产品
@@ -305,6 +307,15 @@ options:
         title: 界面语言
         description: 选择扩展界面的语言，独立于浏览器语言。
         auto: 自动（跟随浏览器）
+    translationLanguage:
+      title: 翻译语言
+      sourceCode:
+        title: 源语言
+        description: 网页原文的语言。选择“自动检测”则由陪读蛙从页面本身判断。
+        auto: 自动检测
+      targetCode:
+        title: 目标语言
+        description: 网页译文使用的语言。
     extensionActivation:
       title: 扩展激活
       description: 在列表之外的所有网站运行，还是只在列表内的网站运行
@@ -796,6 +807,7 @@ options:
           bilingual: 双语对照
           translationOnly: 仅显示翻译
         switched: 翻译模式：$1
+        microsoftNotSupported: Microsoft 翻译不支持仅译文模式，若想开启请切换其他提供商。
       translateRange:
         title: 翻译范围
         description: 选择是仅翻译主要内容还是翻译页面上的所有内容。
@@ -858,6 +870,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/820
       addPrompt: 添加 Prompt
       default: 通用
+      builtIn: 内置
+      copyAndCustomize: 复制并自定义
+      copyName: "$1 副本"
+      builtInPrompts:
+        default:
+          description: 适合日常内容的均衡、可靠翻译
+        precisionRewrite:
+          name: 精翻重写
+          description: 翻译更地道，俚语化；略微增加 token 消耗
       importSuccess: 导入成功
       import: 导入
       export: 导出

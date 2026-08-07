@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: 搜尋設定…
     noResults: 找不到設定
+    open: 搜尋設定
   sidebar:
+    toggle: 切換側邊欄
     settings: 設定
     features: 功能
     product: 產品
@@ -305,6 +307,15 @@ options:
         title: 介面語言
         description: 選擇擴充功能介面的語言，獨立於瀏覽器語言。
         auto: 自動（跟隨瀏覽器）
+    translationLanguage:
+      title: 翻譯語言
+      sourceCode:
+        title: 來源語言
+        description: 網頁原文的語言。選擇「自動偵測」則由陪讀蛙從頁面本身判斷。
+        auto: 自動偵測
+      targetCode:
+        title: 目標語言
+        description: 網頁譯文使用的語言。
     extensionActivation:
       title: 擴充功能啟動
       description: 在清單之外的所有網站執行，還是只在清單內的網站執行
@@ -796,6 +807,7 @@ options:
           bilingual: 雙語對照
           translationOnly: 僅顯示翻譯
         switched: 翻譯模式：$1
+        microsoftNotSupported: Microsoft 翻譯不支援僅譯文模式，若想開啟請切換其他提供商。
       translateRange:
         title: 翻譯範圍
         description: 選擇是僅翻譯主要內容還是翻譯頁面上的所有內容。
@@ -858,6 +870,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/820
       addPrompt: 新增提示詞
       default: 通用
+      builtIn: 內建
+      copyAndCustomize: 複製並自訂
+      copyName: "$1 副本"
+      builtInPrompts:
+        default:
+          description: 適合日常內容的均衡、可靠翻譯
+        precisionRewrite:
+          name: 精翻重寫
+          description: 翻譯更道地、貼近口語與俚語；略增 token 用量
       importSuccess: 匯入成功
       import: 匯入
       export: 匯出

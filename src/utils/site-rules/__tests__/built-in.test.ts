@@ -308,6 +308,53 @@ describe("built-in site rules", () => {
     }
   })
 
+  it("keeps visible Ubiquiti Community release virtual-list items walkable", () => {
+    const resolved = resolveSiteRule(
+      "https://community.ui.com/releases/Community-Update-2026-08-04/a1179dd3-e973-4495-97de-bb992962b49d",
+      BUILT_IN_SITE_RULES,
+      [],
+      [],
+    )
+
+    expect(resolved.matchedRuleIds).toContain("ui-community-releases")
+    expect(resolved.injectedCss).toContain("[style*='visibility: hidden']")
+    expect(resolved.injectedCss).toContain(":has(> div[style*='position: absolute']")
+    expect(resolved.injectedCss).toContain("visibility: visible !important")
+
+    const outsideReleases = resolveSiteRule(
+      "https://community.ui.com/questions/example",
+      BUILT_IN_SITE_RULES,
+      [],
+      [],
+    )
+    expect(outsideReleases.matchedRuleIds).not.toContain("ui-community-releases")
+  })
+
+  it("excludes the X Chat send-time overlay without touching x.com timelines", () => {
+    const resolved = resolveSiteRule(
+      "https://chat.x.com/252792134-1085738455986913280",
+      BUILT_IN_SITE_RULES,
+      [],
+      [],
+    )
+
+    expect(resolved.matchedRuleIds).toContain("readfrog-x-chat")
+    // The footer root covers every branch that renders it (aria-hidden spacer,
+    // absolute overlay, and the `contents` wrapper used for long messages).
+    expect(resolved.excludeSelector).toContain("div.flex.items-center.ml-auto.shrink-0.gap-1")
+    // Its overlay wrapper must stay walkable: excluding that too hides it from
+    // unwrapDeepestOnlyHTMLChild and moves the translation wrapper's insertion
+    // point into the bubble's pre-wrap text block.
+    expect(resolved.excludeSelector).not.toContain("inset-e-0")
+    // chat.x.com is a separate host: the `twitter` rule's tweet whitelist must
+    // not leak in, or every chat bubble would fall outside the include scope.
+    expect(resolved.matchedRuleIds).not.toContain("twitter")
+    expect(resolved.includeSelector).toBeNull()
+
+    const timeline = resolveSiteRule("https://x.com/home", BUILT_IN_SITE_RULES, [], [])
+    expect(timeline.matchedRuleIds).not.toContain("readfrog-x-chat")
+  })
+
   it("does not restrict Steam app pages to an obsolete iframe include (issue #1923)", () => {
     const resolved = resolveSiteRule(
       "https://store.steampowered.com/app/2453660/Hoop_Land/",

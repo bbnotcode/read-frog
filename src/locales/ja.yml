@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: 設定を検索...
     noResults: 設定が見つかりません
+    open: 設定を検索
   sidebar:
+    toggle: サイドバーを切り替え
     settings: 設定
     features: 機能
     product: 製品
@@ -304,6 +306,15 @@ options:
         title: インターフェース言語
         description: ブラウザの言語とは別に、拡張機能のインターフェース言語を選択します。
         auto: 自動（ブラウザに従う）
+    translationLanguage:
+      title: 翻訳言語
+      sourceCode:
+        title: 翻訳元の言語
+        description: ウェブページの原文の言語です。「自動検出」を選ぶとページ自体から判定します。
+        auto: 自動検出
+      targetCode:
+        title: 翻訳先の言語
+        description: ウェブページの訳文に使う言語です。
     extensionActivation:
       title: 拡張機能の有効化
       description: リストに登録したサイト以外のすべてで動作させるか、登録したサイトでのみ動作させるか
@@ -680,6 +691,7 @@ options:
           bilingual: バイリンガル
           translationOnly: 翻訳のみ
         switched: 翻訳モード：$1
+        microsoftNotSupported: Microsoft 翻訳は「翻訳のみ」モードに対応していません。有効にするには他のプロバイダーに切り替えてください。
       translateRange:
         title: 翻訳範囲
         description: ページのメインコンテンツのみを翻訳するか、すべてのコンテンツを翻訳するかを選択します。
@@ -742,6 +754,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/821
       addPrompt: プロンプトを追加
       default: デフォルト
+      builtIn: 組み込み
+      copyAndCustomize: コピーしてカスタマイズ
+      copyName: "$1 のコピー"
+      builtInPrompts:
+        default:
+          description: 日常的なコンテンツに適した、バランスのよい安定した翻訳
+        precisionRewrite:
+          name: 精訳リライト
+          description: より自然で、口語やスラングに強い翻訳。トークン消費が少し増えます
       importSuccess: インポート成功
       import: インポート
       export: エクスポート

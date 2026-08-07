@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: Поиск настроек...
     noResults: Настройки не найдены
+    open: Поиск настроек
   sidebar:
+    toggle: Переключить боковую панель
     settings: Настройки
     features: Функции
     product: Продукт
@@ -304,6 +306,15 @@ options:
         title: Язык интерфейса
         description: Выберите язык интерфейса расширения независимо от языка браузера.
         auto: Авто (как в браузере)
+    translationLanguage:
+      title: Языки перевода
+      sourceCode:
+        title: Исходный язык
+        description: Язык оригинала страниц. При автоопределении язык берётся с самой страницы.
+        auto: Автоопределение
+      targetCode:
+        title: Язык перевода
+        description: Язык, на который переводятся страницы.
     extensionActivation:
       title: Активация расширения
       description: Работать везде, кроме перечисленных сайтов, или только на перечисленных сайтах
@@ -680,6 +691,7 @@ options:
           bilingual: Двуязычный
           translationOnly: Только перевод
         switched: "Режим перевода: $1"
+        microsoftNotSupported: Microsoft Translator не поддерживает режим «только перевод». Чтобы включить его, переключитесь на другого провайдера.
       translateRange:
         title: Охват перевода
         description: Выберите, переводить только основное содержимое или всё содержимое на странице.
@@ -742,6 +754,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/821
       addPrompt: Добавить промпт
       default: По умолчанию
+      builtIn: Встроенный
+      copyAndCustomize: Скопировать и настроить
+      copyName: "Копия $1"
+      builtInPrompts:
+        default:
+          description: Сбалансированный и надёжный перевод повседневных материалов
+        precisionRewrite:
+          name: Перевод с редактурой
+          description: Более естественный и разговорный перевод; расход токенов немного выше
       importSuccess: Импорт успешен
       import: Импорт
       export: Экспорт

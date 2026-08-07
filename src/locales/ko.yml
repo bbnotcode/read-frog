@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: 설정 검색...
     noResults: 설정을 찾을 수 없습니다
+    open: 설정 검색
   sidebar:
+    toggle: 사이드바 전환
     settings: 설정
     features: 기능
     product: 제품
@@ -304,6 +306,15 @@ options:
         title: 인터페이스 언어
         description: 브라우저 언어와 별개로 확장 프로그램의 인터페이스 언어를 선택합니다.
         auto: 자동(브라우저 따름)
+    translationLanguage:
+      title: 번역 언어
+      sourceCode:
+        title: 원본 언어
+        description: 웹페이지 원문의 언어입니다. '자동 감지'를 선택하면 페이지 자체에서 판별합니다.
+        auto: 자동 감지
+      targetCode:
+        title: 대상 언어
+        description: 웹페이지 번역문에 사용할 언어입니다.
     extensionActivation:
       title: 확장 프로그램 활성화
       description: 목록에 없는 모든 사이트에서 실행할지, 목록에 있는 사이트에서만 실행할지
@@ -680,6 +691,7 @@ options:
           bilingual: 이중 언어
           translationOnly: 번역만
         switched: "번역 모드: $1"
+        microsoftNotSupported: Microsoft 번역기는 번역만 모드를 지원하지 않습니다. 사용하려면 다른 제공업체로 전환하세요.
       translateRange:
         title: 번역 범위
         description: 페이지의 주요 내용만 번역할지 모든 내용을 번역할지 선택합니다.
@@ -742,6 +754,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/821
       addPrompt: 프롬프트 추가
       default: 기본
+      builtIn: 기본 제공
+      copyAndCustomize: 복사하여 사용자 지정
+      copyName: "$1 사본"
+      builtInPrompts:
+        default:
+          description: 일상적인 콘텐츠에 적합한 균형 잡히고 안정적인 번역
+        precisionRewrite:
+          name: 번역 다듬기
+          description: 더 자연스럽게 번역하고 구어체·속어를 살립니다. 토큰 사용량이 조금 늘어납니다
       importSuccess: 가져오기 성공
       import: 가져오기
       export: 내보내기

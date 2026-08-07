@@ -89,7 +89,9 @@ options:
   commandPalette:
     placeholder: Search settings...
     noResults: No settings found
+    open: Search settings
   sidebar:
+    toggle: Toggle sidebar
     settings: Settings
     features: Features
     product: Product
@@ -305,6 +307,15 @@ options:
         title: Interface language
         description: Choose the language for the extension's interface, independent of your browser language.
         auto: Auto (follow browser)
+    translationLanguage:
+      title: Translation languages
+      sourceCode:
+        title: Source language
+        description: The language pages are translated from. Auto-detect reads it from the page itself.
+        auto: Auto-detect
+      targetCode:
+        title: Target language
+        description: The language pages are translated into.
     extensionActivation:
       title: Extension activation
       description: Whether Read Frog runs everywhere except the sites you list, or only on the sites you list
@@ -796,6 +807,7 @@ options:
           bilingual: Bilingual
           translationOnly: Translation only
         switched: "Translation mode: $1"
+        microsoftNotSupported: Microsoft Translator doesn't support translation-only mode. To enable it, switch to another provider.
       translateRange:
         title: Translation range
         description: Select whether to translate only the main content or all content on the page.
@@ -858,6 +870,15 @@ options:
       communityPromptsUrl: https://github.com/mengxi-ream/read-frog/discussions/821
       addPrompt: Add prompt
       default: Default
+      builtIn: Built-in
+      copyAndCustomize: Copy and customize
+      copyName: "$1 copy"
+      builtInPrompts:
+        default:
+          description: Balanced, reliable translation for everyday content
+        precisionRewrite:
+          name: Polished rewrite
+          description: More idiomatic, colloquial translations; slightly higher token usage
       importSuccess: Import success
       import: Import
       export: Export
