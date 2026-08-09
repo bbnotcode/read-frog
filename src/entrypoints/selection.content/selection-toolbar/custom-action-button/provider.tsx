@@ -26,6 +26,10 @@ import {
   selectionAtom,
   selectionSessionAtom,
 } from "../atoms"
+import {
+  type ExternalCustomActionRequest,
+  OPEN_EXTERNAL_CUSTOM_ACTION_EVENT,
+} from "../external-custom-action-source"
 import { createSelectionToolbarPrecheckError } from "../inline-error"
 import { useSelectionOpenRequestResolver } from "../use-selection-open-request"
 import { CustomActionContent } from "./custom-action-content"
@@ -322,6 +326,30 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
       openContextMenuCustomAction(message.data.actionId)
     })
   }, [openContextMenuCustomAction])
+
+  useEffect(() => {
+    const handleExternalCustomAction = (event: Event) => {
+      const request = (event as CustomEvent<ExternalCustomActionRequest>).detail
+      if (!request?.actionId || !request.selectionSnapshot.text) return
+
+      openActionRequest({
+        actionId: request.actionId,
+        anchor: request.anchor,
+        session: {
+          id: --nextEphemeralSessionIdRef.current,
+          createdAt: Date.now(),
+          selectionSnapshot: request.selectionSnapshot,
+          contextSnapshot: request.contextSnapshot,
+        },
+        surface: ANALYTICS_SURFACE.SELECTION_TOOLBAR,
+      })
+    }
+
+    window.addEventListener(OPEN_EXTERNAL_CUSTOM_ACTION_EVENT, handleExternalCustomAction)
+    return () => {
+      window.removeEventListener(OPEN_EXTERNAL_CUSTOM_ACTION_EVENT, handleExternalCustomAction)
+    }
+  }, [openActionRequest])
 
   useEffect(() => {
     if (!isOpen || !executionPlan.error || executionPlan.executionContext) {

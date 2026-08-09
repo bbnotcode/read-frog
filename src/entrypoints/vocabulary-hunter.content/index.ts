@@ -1,13 +1,7 @@
 import type { ContentScriptContext } from "#imports"
-import { LANG_CODE_TO_EN_NAME } from "@read-frog/definitions"
 import { defineContentScript } from "#imports"
 import { getLocalConfig } from "@/utils/config/storage"
-import { streamBackgroundStructuredObject } from "@/utils/content-script/background-stream-client"
 import { sendMessage } from "@/utils/message"
-import { resolveModelId } from "@/utils/providers/model-id"
-import { getProviderOptionsWithOverride } from "@/utils/providers/options"
-import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
-import { getTopLevelReasoning } from "@/utils/providers/reasoning"
 import { resolveVocabularyDictionaryAction } from "@/utils/vocabulary-hunter/ai-action"
 import {
   findCandidateWords,
@@ -38,15 +32,11 @@ import {
   mergeVocabularyStatusesByUpdatedAt,
   syncKnownWord,
 } from "@/utils/vocabulary-hunter/sync"
-import {
-  buildSelectionToolbarCustomActionSystemPrompt,
-  replaceSelectionToolbarCustomActionPromptTokens,
-} from "../selection.content/selection-toolbar/custom-action-prompt"
+import { openExternalSelectionCustomAction } from "../selection.content/selection-toolbar/external-custom-action-source"
 
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
 const MAX_RANGES = 1200
-const AI_EXPLANATION_TIMEOUT_MS = 30_000
 const INVALID_ANCESTOR_SELECTOR = `canvas,code,kbd,noscript,pre,script,style,svg,${VOCABULARY_INTERACTIVE_SELECTOR}`
 const INVALID_TAGS = new Set([
   "BUTTON",
@@ -294,114 +284,39 @@ function statusText(word: string, state: VocabularyHunterState) {
   return "尚未掌握"
 }
 
-async function requestDictionaryExplanation(
-  word: string,
-  sentence: string,
-  render: (result: Record<string, unknown> | null, error?: string, complete?: boolean) => void,
-  signal?: AbortSignal,
-) {
+async function openReadFrogDictionaryAction(hit: TrackedRange) {
   const config = await getLocalConfig()
   if (!config) {
-    render(null, "ReadFrog 配置尚未准备好，请稍后重试。")
-    return
+    throw new Error("ReadFrog 配置尚未准备好，请稍后重试。")
   }
 
   const action = resolveVocabularyDictionaryAction(config.selectionToolbar)
 
   if (!action) {
-    render(null, "请先在 ReadFrog 的“自定义 AI 操作”中启用词典操作。")
-    return
+    throw new Error("请先在 ReadFrog 的“自定义 AI 操作”中启用词典操作。")
   }
 
-  const provider = resolveProviderRefForCapability(
-    "selectionToolbar.customAction",
-    config.providersConfig,
-    action.providerId,
-  )
-  if (!provider) {
-    render(null, "词典操作所选的 AI 服务当前不可用。")
-    return
-  }
-
-  const promptTokens = {
-    selection: word,
-    paragraphs: sentence,
-    targetLanguage: LANG_CODE_TO_EN_NAME[config.language.targetCode],
-    webTitle: document.title,
-    // A dictionary lookup only needs the sentence around the selected word.
-    // Parsing and cloning the entire live page here can stall indefinitely on
-    // large virtualized feeds such as X or Discord before the AI request starts.
-    webContent: "",
-  }
-  const instructions = buildSelectionToolbarCustomActionSystemPrompt(
-    action.systemPrompt,
-    promptTokens,
-    action.outputSchema,
-  )
-  const prompt = replaceSelectionToolbarCustomActionPromptTokens(action.prompt, promptTokens)
-  const modelName = provider.kind === "local" ? (resolveModelId(provider.config.model) ?? "") : ""
-  const reasoning = provider.kind === "local" ? getTopLevelReasoning(provider.config) : undefined
-  const providerOptions =
-    provider.kind === "local"
-      ? getProviderOptionsWithOverride(
-          modelName,
-          provider.config.provider,
-          provider.config.providerOptions,
-          reasoning,
-        )
-      : undefined
-  const temperature = provider.kind === "local" ? provider.config.temperature : undefined
-
-  const payload = {
-    providerId: provider.id,
-    instructions,
-    prompt,
-    outputSchema: action.outputSchema.map(({ name, type }) => ({ name, type })),
-    providerOptions,
-    reasoning,
-    temperature,
-  }
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (signal?.aborted) return
-
-    const attemptController = new AbortController()
-    let didTimeout = false
-    const abortAttempt = () => attemptController.abort()
-    signal?.addEventListener("abort", abortAttempt, { once: true })
-    const timeout = setTimeout(() => {
-      didTimeout = true
-      attemptController.abort()
-    }, AI_EXPLANATION_TIMEOUT_MS)
-
-    try {
-      const response = await streamBackgroundStructuredObject(payload, {
-        signal: attemptController.signal,
-        onChunk: (snapshot) => render(snapshot.output),
-      })
-      render(response.output, undefined, true)
-      return
-    } catch (error) {
-      if (signal?.aborted) return
-      if (didTimeout) {
-        render(null, "AI 解释超时（已等待 30 秒）。请检查 ReadFrog AI 服务或模型配置后重试。")
-        return
-      }
-      const message = error instanceof Error ? error.message : "AI 解释失败，请检查模型配置。"
-      const isTransientNetworkError = /failed to fetch|network|load failed|connection/i.test(
-        message,
-      )
-      if (attempt === 0 && isTransientNetworkError) {
-        await new Promise((resolve) => setTimeout(resolve, 450))
-        continue
-      }
-      render(null, message)
-      return
-    } finally {
-      clearTimeout(timeout)
-      signal?.removeEventListener("abort", abortAttempt)
-    }
-  }
+  const sentence = sentenceForRange(hit.range)
+  const rect = hit.range.getBoundingClientRect()
+  openExternalSelectionCustomAction({
+    actionId: action.id,
+    anchor: { x: rect.right, y: rect.bottom },
+    selectionSnapshot: {
+      text: hit.word,
+      ranges: [
+        {
+          startContainer: hit.range.startContainer,
+          startOffset: hit.range.startOffset,
+          endContainer: hit.range.endContainer,
+          endOffset: hit.range.endOffset,
+        },
+      ],
+    },
+    contextSnapshot: {
+      text: sentence,
+      paragraphs: [sentence],
+    },
+  })
 }
 
 async function start(ctx: ContentScriptContext) {
@@ -427,11 +342,6 @@ async function start(ctx: ContentScriptContext) {
   let pendingHover: TrackedRange | null = null
   let selectedFromTextSelection = false
   let requestSequence = 0
-  let activeAiRequest: AbortController | undefined
-  const cancelActiveAiRequest = () => {
-    activeAiRequest?.abort()
-    activeAiRequest = undefined
-  }
   const unknownHighlight = new Highlight()
   const fuzzyHighlight = new Highlight()
   CSS.highlights.set(UNKNOWN_HIGHLIGHT, unknownHighlight)
@@ -560,7 +470,6 @@ async function start(ctx: ContentScriptContext) {
     dictionary: Exclude<VocabularyDictionary, "ai">,
     hit: TrackedRange,
   ) => {
-    cancelActiveAiRequest()
     const currentSequence = ++requestSequence
     setActiveDictionary(dictionary)
     result.classList.add("open")
@@ -676,7 +585,6 @@ async function start(ctx: ContentScriptContext) {
     })
     sentenceLabel.textContent = sentenceForRange(hit.range)
     if (changedWord) {
-      cancelActiveAiRequest()
       requestSequence += 1
       result.classList.remove("open")
       result.innerHTML = ""
@@ -703,7 +611,6 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hideTimer)
     hideTimer = setTimeout(() => {
       card.classList.remove("open")
-      cancelActiveAiRequest()
       requestSequence += 1
     }, 260)
   }
@@ -1040,25 +947,18 @@ async function start(ctx: ContentScriptContext) {
     if (suppressDictionaryClick) return
     if (dictionary && selected) {
       if (dictionary === "ai") {
-        cancelActiveAiRequest()
-        const aiRequest = new AbortController()
-        activeAiRequest = aiRequest
-        const currentSequence = ++requestSequence
         setActiveDictionary("ai")
         result.classList.add("open")
-        result.innerHTML = '<div class="loading">ReadFrog AI 正在结合当前语境解释…</div>'
-        const word = selected.word
-        const sentence = sentenceForRange(selected.range)
-        void requestDictionaryExplanation(
-          word,
-          sentence,
-          (value, error, complete) => {
-            if (currentSequence === requestSequence) renderResult(value, error, complete)
-          },
-          aiRequest.signal,
-        ).finally(() => {
-          if (activeAiRequest === aiRequest) activeAiRequest = undefined
-        })
+        result.innerHTML = '<div class="loading">正在打开 ReadFrog 官方词典…</div>'
+        const hit = selected
+        void openReadFrogDictionaryAction(hit)
+          .then(() => {
+            card.classList.remove("open")
+            selectedFromTextSelection = false
+          })
+          .catch((error) => {
+            renderResult(null, error instanceof Error ? error.message : "无法打开 ReadFrog 词典")
+          })
       } else {
         void showEmbeddedDictionary(dictionary, selected)
       }
@@ -1070,7 +970,6 @@ async function start(ctx: ContentScriptContext) {
     if (!action) return
     if (action === "close") {
       card.classList.remove("open")
-      cancelActiveAiRequest()
       requestSequence += 1
       selectedFromTextSelection = false
       return
@@ -1094,7 +993,6 @@ async function start(ctx: ContentScriptContext) {
   })
 
   ctx.onInvalidated(() => {
-    cancelActiveAiRequest()
     clearTimeout(refreshTimer)
     clearTimeout(hideTimer)
     clearTimeout(hoverTimer)
