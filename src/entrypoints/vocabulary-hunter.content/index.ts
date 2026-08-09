@@ -9,6 +9,7 @@ import { resolveModelId } from "@/utils/providers/model-id"
 import { getProviderOptionsWithOverride } from "@/utils/providers/options"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
 import { getTopLevelReasoning } from "@/utils/providers/reasoning"
+import { resolveVocabularyDictionaryAction } from "@/utils/vocabulary-hunter/ai-action"
 import {
   findCandidateWords,
   normalizeSelectedWord,
@@ -299,15 +300,14 @@ async function requestDictionaryExplanation(
   render: (result: Record<string, unknown> | null, error?: string, complete?: boolean) => void,
 ) {
   const config = await getLocalConfig()
-  const action =
-    config?.selectionToolbar.customActions.find(
-      (item) => item.enabled !== false && item.id === "default-dictionary",
-    ) ??
-    config?.selectionToolbar.customActions.find(
-      (item) => item.enabled !== false && item.icon === "tabler:book-2",
-    )
+  if (!config) {
+    render(null, "ReadFrog 配置尚未准备好，请稍后重试。")
+    return
+  }
 
-  if (!config || !action) {
+  const action = resolveVocabularyDictionaryAction(config.selectionToolbar)
+
+  if (!action) {
     render(null, "请先在 ReadFrog 的“自定义 AI 操作”中启用词典操作。")
     return
   }
