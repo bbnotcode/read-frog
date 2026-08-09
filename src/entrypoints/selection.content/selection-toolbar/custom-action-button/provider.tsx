@@ -28,8 +28,8 @@ import {
 } from "../atoms"
 import {
   type ExternalCustomActionRequest,
-  notifyExternalSelectionCustomActionState,
   OPEN_EXTERNAL_CUSTOM_ACTION_EVENT,
+  publishExternalSelectionCustomActionResult,
 } from "../external-custom-action-source"
 import { createSelectionToolbarPrecheckError } from "../inline-error"
 import { useSelectionOpenRequestResolver } from "../use-selection-open-request"
@@ -72,6 +72,91 @@ export function useSelectionCustomActionPopover() {
   return useSelectionCustomActionContext()
 }
 
+function ExternalCustomActionExecutor({
+  request,
+  onFinished,
+}: {
+  request: ExternalCustomActionRequest
+  onFinished: () => void
+}) {
+  const selectionToolbarConfig = useAtomValue(configFieldsAtomMap.selectionToolbar)
+  const providersConfig = useAtomValue(configFieldsAtomMap.providersConfig)
+  const language = useAtomValue(configFieldsAtomMap.language)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const completedRef = useRef(false)
+  const action = useMemo(
+    () => findSelectionToolbarAction(selectionToolbarConfig, request.actionId),
+    [request.actionId, selectionToolbarConfig],
+  )
+  const customActionRequest = useMemo(
+    () => ({
+      language,
+      action: action?.enabled === false ? null : (action ?? null),
+      provider: action
+        ? resolveProviderRefForCapability(
+            "selectionToolbar.customAction",
+            providersConfig,
+            action.providerId,
+          )
+        : null,
+    }),
+    [action, language, providersConfig],
+  )
+  const webPageContext = useCustomActionWebPageContext(true, request.requestId)
+  const executionPlan = useMemo(
+    () =>
+      buildCustomActionExecutionPlan(
+        customActionRequest,
+        normalizeSelectedText(request.selectionSnapshot.text),
+        request.contextSnapshot.text,
+        webPageContext,
+      ),
+    [customActionRequest, request, webPageContext],
+  )
+  const { error, isRunning, result } = useCustomActionExecution({
+    analyticsSurface: ANALYTICS_SURFACE.SELECTION_TOOLBAR,
+    bodyRef,
+    executionContext: executionPlan.executionContext,
+    open: true,
+    popoverSessionKey: request.requestId,
+    rerunNonce: 0,
+  })
+
+  useEffect(() => {
+    if (!result || completedRef.current) return
+    publishExternalSelectionCustomActionResult({
+      requestId: request.requestId,
+      value: result,
+    })
+  }, [request.requestId, result])
+
+  useEffect(() => {
+    const displayedError = error ?? executionPlan.error
+    if (!displayedError || completedRef.current) return
+    completedRef.current = true
+    publishExternalSelectionCustomActionResult({
+      requestId: request.requestId,
+      value: null,
+      error: displayedError.description,
+      complete: true,
+    })
+    onFinished()
+  }, [error, executionPlan.error, onFinished, request.requestId])
+
+  useEffect(() => {
+    if (!executionPlan.executionContext || isRunning || !result || completedRef.current) return
+    completedRef.current = true
+    publishExternalSelectionCustomActionResult({
+      requestId: request.requestId,
+      value: result,
+      complete: true,
+    })
+    onFinished()
+  }, [executionPlan.executionContext, isRunning, onFinished, request.requestId, result])
+
+  return null
+}
+
 export function SelectionCustomActionProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
@@ -79,6 +164,7 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
   const [rerunNonce, setRerunNonce] = useState(0)
   const [activeSession, setActiveSession] = useState<SelectionSession | null>(null)
   const [activeActionId, setActiveActionId] = useState<string | null>(null)
+  const [externalRequest, setExternalRequest] = useState<ExternalCustomActionRequest | null>(null)
   const [sourceSurface, setSourceSurface] = useState<
     typeof ANALYTICS_SURFACE.SELECTION_TOOLBAR | typeof ANALYTICS_SURFACE.CONTEXT_MENU
   >(ANALYTICS_SURFACE.SELECTION_TOOLBAR)
@@ -96,7 +182,6 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
   const popoverActionsRef = useRef<SelectionPopoverActions | null>(null)
   const nextEphemeralSessionIdRef = useRef(0)
   const trackedPrecheckErrorKeyRef = useRef<string | null>(null)
-  const externalRequestActiveRef = useRef(false)
   const { resolveContextMenuOpenRequest } = useSelectionOpenRequestResolver(selectionSession)
   const selectionText = activeSession?.selectionSnapshot.text ?? null
   const cleanSelection = useMemo(() => normalizeSelectedText(selectionText), [selectionText])
@@ -190,10 +275,6 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
         setPopoverSessionKey((prev) => prev + 1)
         applyPendingSession()
       } else {
-        if (externalRequestActiveRef.current) {
-          externalRequestActiveRef.current = false
-          notifyExternalSelectionCustomActionState(false)
-        }
         resetPopoverSession({
           clearAnchor: pendingOpenRequestRef.current === null,
         })
@@ -337,27 +418,14 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
     const handleExternalCustomAction = (event: Event) => {
       const request = (event as CustomEvent<ExternalCustomActionRequest>).detail
       if (!request?.actionId || !request.selectionSnapshot.text) return
-
-      externalRequestActiveRef.current = true
-      notifyExternalSelectionCustomActionState(true)
-      openActionRequest({
-        actionId: request.actionId,
-        anchor: request.anchor,
-        session: {
-          id: --nextEphemeralSessionIdRef.current,
-          createdAt: Date.now(),
-          selectionSnapshot: request.selectionSnapshot,
-          contextSnapshot: request.contextSnapshot,
-        },
-        surface: ANALYTICS_SURFACE.SELECTION_TOOLBAR,
-      })
+      setExternalRequest(request)
     }
 
     window.addEventListener(OPEN_EXTERNAL_CUSTOM_ACTION_EVENT, handleExternalCustomAction)
     return () => {
       window.removeEventListener(OPEN_EXTERNAL_CUSTOM_ACTION_EVENT, handleExternalCustomAction)
     }
-  }, [openActionRequest])
+  }, [])
 
   useEffect(() => {
     if (!isOpen || !executionPlan.error || executionPlan.executionContext) {
@@ -469,6 +537,13 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
           </SelectionToolbarFooterContent>
         </SelectionPopover.Content>
       </SelectionPopover.Root>
+      {externalRequest && (
+        <ExternalCustomActionExecutor
+          key={externalRequest.requestId}
+          request={externalRequest}
+          onFinished={() => setExternalRequest(null)}
+        />
+      )}
       <SaveToNotebaseDialogHost />
     </SelectionCustomActionContext>
   )

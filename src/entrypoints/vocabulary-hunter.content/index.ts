@@ -33,7 +33,8 @@ import {
   syncKnownWord,
 } from "@/utils/vocabulary-hunter/sync"
 import {
-  EXTERNAL_CUSTOM_ACTION_STATE_EVENT,
+  type ExternalCustomActionResult,
+  EXTERNAL_CUSTOM_ACTION_RESULT_EVENT,
   openExternalSelectionCustomAction,
 } from "../selection.content/selection-toolbar/external-custom-action-source"
 
@@ -287,7 +288,7 @@ function statusText(word: string, state: VocabularyHunterState) {
   return "尚未掌握"
 }
 
-async function openReadFrogDictionaryAction(hit: TrackedRange) {
+async function openReadFrogDictionaryAction(hit: TrackedRange, requestId: number) {
   const config = await getLocalConfig()
   if (!config) {
     throw new Error("ReadFrog 配置尚未准备好，请稍后重试。")
@@ -302,6 +303,7 @@ async function openReadFrogDictionaryAction(hit: TrackedRange) {
   const sentence = sentenceForRange(hit.range)
   const rect = hit.range.getBoundingClientRect()
   openExternalSelectionCustomAction({
+    requestId,
     actionId: action.id,
     anchor: { x: rect.right, y: rect.bottom },
     selectionSnapshot: {
@@ -344,7 +346,7 @@ async function start(ctx: ContentScriptContext) {
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
   let pendingHover: TrackedRange | null = null
   let selectedFromTextSelection = false
-  let officialDictionaryOpen = false
+  let activeExternalRequestId: number | undefined
   let requestSequence = 0
   const unknownHighlight = new Highlight()
   const fuzzyHighlight = new Highlight()
@@ -474,6 +476,7 @@ async function start(ctx: ContentScriptContext) {
     dictionary: Exclude<VocabularyDictionary, "ai">,
     hit: TrackedRange,
   ) => {
+    activeExternalRequestId = undefined
     const currentSequence = ++requestSequence
     setActiveDictionary(dictionary)
     result.classList.add("open")
@@ -613,7 +616,6 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hoverTimer)
     pendingHover = null
     clearTimeout(hideTimer)
-    if (officialDictionaryOpen) return
     hideTimer = setTimeout(() => {
       card.classList.remove("open")
       requestSequence += 1
@@ -777,11 +779,14 @@ async function start(ctx: ContentScriptContext) {
 
   card.addEventListener("mouseenter", () => clearTimeout(hideTimer))
   card.addEventListener("mouseleave", hideCardSoon)
-  const handleOfficialDictionaryState = (event: Event) => {
-    officialDictionaryOpen = (event as CustomEvent<boolean>).detail
-    if (officialDictionaryOpen) clearTimeout(hideTimer)
+  const handleExternalCustomActionResult = (event: Event) => {
+    const response = (event as CustomEvent<ExternalCustomActionResult>).detail
+    if (!response || response.requestId !== activeExternalRequestId) return
+    renderResult(response.value, response.error, response.complete)
+    if (response.complete) activeExternalRequestId = undefined
+    if (selected) positionCard(card, selected.range)
   }
-  window.addEventListener(EXTERNAL_CUSTOM_ACTION_STATE_EVENT, handleOfficialDictionaryState)
+  window.addEventListener(EXTERNAL_CUSTOM_ACTION_RESULT_EVENT, handleExternalCustomActionResult)
   const keepCardInViewport = () => {
     if (selected && card.classList.contains("open")) positionCard(card, selected.range)
   }
@@ -957,25 +962,18 @@ async function start(ctx: ContentScriptContext) {
     if (suppressDictionaryClick) return
     if (dictionary && selected) {
       if (dictionary === "ai") {
+        const currentRequestId = ++requestSequence
+        activeExternalRequestId = currentRequestId
         setActiveDictionary("ai")
         result.classList.add("open")
-        result.innerHTML = '<div class="loading">正在打开 ReadFrog 官方词典…</div>'
+        result.innerHTML = '<div class="loading">ReadFrog AI 正在结合当前语境解释…</div>'
         const hit = selected
-        void openReadFrogDictionaryAction(hit)
-          .then(() => {
-            // Keep Vocabulary Hunter mounted behind the official dictionary.
-            // Closing the official popover should return to the same word so
-            // the user can immediately switch back to Haici or Google.
-            const fallbackDictionary =
-              state.dictionaryOrder.find(
-                (item): item is Exclude<VocabularyDictionary, "ai"> =>
-                  item !== "ai" && state.enabledDictionaries.includes(item),
-              ) ?? "haici"
-            void showEmbeddedDictionary(fallbackDictionary, hit)
-          })
-          .catch((error) => {
+        void openReadFrogDictionaryAction(hit, currentRequestId).catch((error) => {
+          if (activeExternalRequestId === currentRequestId) {
             renderResult(null, error instanceof Error ? error.message : "无法打开 ReadFrog 词典")
-          })
+            activeExternalRequestId = undefined
+          }
+        })
       } else {
         void showEmbeddedDictionary(dictionary, selected)
       }
@@ -987,6 +985,7 @@ async function start(ctx: ContentScriptContext) {
     if (!action) return
     if (action === "close") {
       card.classList.remove("open")
+      activeExternalRequestId = undefined
       requestSequence += 1
       selectedFromTextSelection = false
       return
@@ -1018,7 +1017,10 @@ async function start(ctx: ContentScriptContext) {
     cardResizeObserver.disconnect()
     window.removeEventListener("resize", keepCardInViewport)
     window.removeEventListener("scroll", keepCardInViewport, true)
-    window.removeEventListener(EXTERNAL_CUSTOM_ACTION_STATE_EVENT, handleOfficialDictionaryState)
+    window.removeEventListener(
+      EXTERNAL_CUSTOM_ACTION_RESULT_EVENT,
+      handleExternalCustomActionResult,
+    )
     document.removeEventListener("keydown", handleShortcut, true)
     document.removeEventListener("mouseup", showSelectedWord, true)
     unwatchState()
