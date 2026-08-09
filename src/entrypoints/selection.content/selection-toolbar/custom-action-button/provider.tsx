@@ -28,6 +28,7 @@ import {
 } from "../atoms"
 import {
   type ExternalCustomActionRequest,
+  notifyExternalSelectionCustomActionState,
   OPEN_EXTERNAL_CUSTOM_ACTION_EVENT,
 } from "../external-custom-action-source"
 import { createSelectionToolbarPrecheckError } from "../inline-error"
@@ -95,6 +96,7 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
   const popoverActionsRef = useRef<SelectionPopoverActions | null>(null)
   const nextEphemeralSessionIdRef = useRef(0)
   const trackedPrecheckErrorKeyRef = useRef<string | null>(null)
+  const externalRequestActiveRef = useRef(false)
   const { resolveContextMenuOpenRequest } = useSelectionOpenRequestResolver(selectionSession)
   const selectionText = activeSession?.selectionSnapshot.text ?? null
   const cleanSelection = useMemo(() => normalizeSelectedText(selectionText), [selectionText])
@@ -188,6 +190,10 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
         setPopoverSessionKey((prev) => prev + 1)
         applyPendingSession()
       } else {
+        if (externalRequestActiveRef.current) {
+          externalRequestActiveRef.current = false
+          notifyExternalSelectionCustomActionState(false)
+        }
         resetPopoverSession({
           clearAnchor: pendingOpenRequestRef.current === null,
         })
@@ -332,6 +338,8 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
       const request = (event as CustomEvent<ExternalCustomActionRequest>).detail
       if (!request?.actionId || !request.selectionSnapshot.text) return
 
+      externalRequestActiveRef.current = true
+      notifyExternalSelectionCustomActionState(true)
       openActionRequest({
         actionId: request.actionId,
         anchor: request.anchor,

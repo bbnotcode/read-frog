@@ -32,7 +32,10 @@ import {
   mergeVocabularyStatusesByUpdatedAt,
   syncKnownWord,
 } from "@/utils/vocabulary-hunter/sync"
-import { openExternalSelectionCustomAction } from "../selection.content/selection-toolbar/external-custom-action-source"
+import {
+  EXTERNAL_CUSTOM_ACTION_STATE_EVENT,
+  openExternalSelectionCustomAction,
+} from "../selection.content/selection-toolbar/external-custom-action-source"
 
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
@@ -341,6 +344,7 @@ async function start(ctx: ContentScriptContext) {
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
   let pendingHover: TrackedRange | null = null
   let selectedFromTextSelection = false
+  let officialDictionaryOpen = false
   let requestSequence = 0
   const unknownHighlight = new Highlight()
   const fuzzyHighlight = new Highlight()
@@ -609,6 +613,7 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hoverTimer)
     pendingHover = null
     clearTimeout(hideTimer)
+    if (officialDictionaryOpen) return
     hideTimer = setTimeout(() => {
       card.classList.remove("open")
       requestSequence += 1
@@ -772,6 +777,11 @@ async function start(ctx: ContentScriptContext) {
 
   card.addEventListener("mouseenter", () => clearTimeout(hideTimer))
   card.addEventListener("mouseleave", hideCardSoon)
+  const handleOfficialDictionaryState = (event: Event) => {
+    officialDictionaryOpen = (event as CustomEvent<boolean>).detail
+    if (officialDictionaryOpen) clearTimeout(hideTimer)
+  }
+  window.addEventListener(EXTERNAL_CUSTOM_ACTION_STATE_EVENT, handleOfficialDictionaryState)
   const keepCardInViewport = () => {
     if (selected && card.classList.contains("open")) positionCard(card, selected.range)
   }
@@ -953,8 +963,15 @@ async function start(ctx: ContentScriptContext) {
         const hit = selected
         void openReadFrogDictionaryAction(hit)
           .then(() => {
-            card.classList.remove("open")
-            selectedFromTextSelection = false
+            // Keep Vocabulary Hunter mounted behind the official dictionary.
+            // Closing the official popover should return to the same word so
+            // the user can immediately switch back to Haici or Google.
+            const fallbackDictionary =
+              state.dictionaryOrder.find(
+                (item): item is Exclude<VocabularyDictionary, "ai"> =>
+                  item !== "ai" && state.enabledDictionaries.includes(item),
+              ) ?? "haici"
+            void showEmbeddedDictionary(fallbackDictionary, hit)
           })
           .catch((error) => {
             renderResult(null, error instanceof Error ? error.message : "无法打开 ReadFrog 词典")
@@ -1001,6 +1018,7 @@ async function start(ctx: ContentScriptContext) {
     cardResizeObserver.disconnect()
     window.removeEventListener("resize", keepCardInViewport)
     window.removeEventListener("scroll", keepCardInViewport, true)
+    window.removeEventListener(EXTERNAL_CUSTOM_ACTION_STATE_EVENT, handleOfficialDictionaryState)
     document.removeEventListener("keydown", handleShortcut, true)
     document.removeEventListener("mouseup", showSelectedWord, true)
     unwatchState()
