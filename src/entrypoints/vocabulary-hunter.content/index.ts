@@ -3,7 +3,6 @@ import { LANG_CODE_TO_EN_NAME } from "@read-frog/definitions"
 import { defineContentScript } from "#imports"
 import { getLocalConfig } from "@/utils/config/storage"
 import { streamBackgroundStructuredObject } from "@/utils/content-script/background-stream-client"
-import { getOrCreateWebPageContext } from "@/utils/host/translate/webpage-context"
 import { sendMessage } from "@/utils/message"
 import { resolveModelId } from "@/utils/providers/model-id"
 import { getProviderOptionsWithOverride } from "@/utils/providers/options"
@@ -324,13 +323,15 @@ async function requestDictionaryExplanation(
     return
   }
 
-  const webContext = await getOrCreateWebPageContext().catch(() => null)
   const promptTokens = {
     selection: word,
     paragraphs: sentence,
     targetLanguage: LANG_CODE_TO_EN_NAME[config.language.targetCode],
-    webTitle: webContext?.webTitle ?? document.title,
-    webContent: webContext?.webContent ?? "",
+    webTitle: document.title,
+    // A dictionary lookup only needs the sentence around the selected word.
+    // Parsing and cloning the entire live page here can stall indefinitely on
+    // large virtualized feeds such as X or Discord before the AI request starts.
+    webContent: "",
   }
   const instructions = buildSelectionToolbarCustomActionSystemPrompt(
     action.systemPrompt,
