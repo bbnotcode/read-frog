@@ -157,6 +157,12 @@ interface ProtocolMap {
   getHostedAiStatus: () => Promise<HostedAiStatus | null>
   // network proxy
   backgroundFetch: (data: ProxyRequest) => Promise<ProxyResponse>
+  syncVocabularyGist: () => Promise<{ ok: boolean }>
+  updateVocabularyWord: (data: {
+    word: string
+    status: "known" | "fuzzy" | "unknown" | null
+    updatedAt: number
+  }) => Promise<{ applied: boolean }>
   // cache management
   clearAllTranslationRelatedCache: () => Promise<void>
   clearAiSegmentationCache: () => Promise<void>

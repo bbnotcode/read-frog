@@ -36,6 +36,11 @@ import { setUpSubtitlesTranslationQueue, setUpWebPageTranslationQueue } from "./
 import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
+import {
+  runVocabularyGistSync,
+  setupVocabularyGistAutoSync,
+  updateVocabularyWord,
+} from "./vocabulary-gist-sync"
 
 export default defineBackground({
   type: "module",
@@ -80,6 +85,11 @@ export default defineBackground({
       logger.info("openOptionsPage", message.data)
       await openOptionsPage(message.data)
     })
+
+    onMessage("syncVocabularyGist", async () => ({ ok: await runVocabularyGistSync() }))
+    onMessage("updateVocabularyWord", async (message) =>
+      updateVocabularyWord(message.data.word, message.data.status, message.data.updatedAt),
+    )
 
     setupSidePanelMessageHandler({
       extensionBrowser: browser,
@@ -141,6 +151,7 @@ export default defineBackground({
     proxyFetch()
     setupHostedAiStatusHandler()
     setupNotebasePendingSaveProcessor(() => backgroundReady)
+    setupVocabularyGistAutoSync()
     setupEdgeTTSMessageHandlers()
     setupLLMGenerateTextMessageHandlers()
     setupTTSPlaybackMessageHandlers()

@@ -66,6 +66,17 @@ export function FeaturesNav() {
 
           <SidebarMenuItem>
             <SidebarMenuButton
+              render={<Link to="/vocabulary-hunter" />}
+              isActive={pathname === "/vocabulary-hunter"}
+              tooltip="生词猎手"
+            >
+              <Icon icon="tabler:book-2" />
+              <span>生词猎手</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
               render={<Link to="/input-translation" />}
               isActive={pathname === "/input-translation"}
               tooltip={i18n.t("options.inputTranslation.title")}
