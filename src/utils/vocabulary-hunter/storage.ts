@@ -2,10 +2,13 @@ import type { VocabularyLevel, VocabularyStatus } from "./candidates"
 import { storage } from "#imports"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
+const VOCABULARY_HUNTER_SECRET_KEY = "local:vocabulary-hunter-secret"
+export const VOCABULARY_HUNTER_SCHEMA_VERSION = 2
 export type VocabularyDictionary = "haici" | "google" | "ai"
 const SUPPORTED_DICTIONARIES: VocabularyDictionary[] = ["haici", "google", "ai"]
 
 export interface VocabularyHunterState {
+  schemaVersion: number
   enabled: boolean
   minimumLength: number
   enabledLevels: VocabularyLevel[]
@@ -14,7 +17,6 @@ export interface VocabularyHunterState {
   unknownHighlightColor: string
   fuzzyHighlightColor: string
   gistId: string
-  gistToken: string
   gistAutoSync: boolean
   gistLastSyncAt: number
   gistLastSyncCount: number
@@ -24,6 +26,7 @@ export interface VocabularyHunterState {
 }
 
 export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
+  schemaVersion: VOCABULARY_HUNTER_SCHEMA_VERSION,
   enabled: true,
   minimumLength: 2,
   enabledLevels: ["p", "m", "h", "4", "6", "g", "o"],
@@ -32,7 +35,6 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   unknownHighlightColor: "#fb7185",
   fuzzyHighlightColor: "#fbbf24",
   gistId: "",
-  gistToken: "",
   gistAutoSync: false,
   gistLastSyncAt: 0,
   gistLastSyncCount: 0,
@@ -41,7 +43,44 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   statusUpdatedAt: {},
 }
 
-function migrateState(
+interface VocabularyHunterSecret {
+  gistToken: string
+}
+
+export async function getVocabularyHunterGistToken() {
+  const secret = await storage.getItem<VocabularyHunterSecret>(VOCABULARY_HUNTER_SECRET_KEY)
+  return secret?.gistToken ?? ""
+}
+
+export async function setVocabularyHunterGistToken(gistToken: string) {
+  await storage.setItem<VocabularyHunterSecret>(VOCABULARY_HUNTER_SECRET_KEY, {
+    gistToken: gistToken.trim(),
+  })
+}
+
+export function applyVocabularyWordUpdate(
+  state: VocabularyHunterState,
+  word: string,
+  status: VocabularyStatus | null,
+  updatedAt: number,
+) {
+  const normalized = word.trim().toLocaleLowerCase()
+  if (!/^[a-z]+(?:'[a-z]+)?$/.test(normalized) || normalized.length > 64) return state
+  if (!Number.isFinite(updatedAt) || updatedAt < 0) return state
+  if ((state.statusUpdatedAt[normalized] ?? 0) > updatedAt) return state
+  const statuses = { ...state.statuses }
+  const statusUpdatedAt = { ...state.statusUpdatedAt }
+  if (status === null) {
+    delete statuses[normalized]
+    delete statusUpdatedAt[normalized]
+  } else {
+    statuses[normalized] = status
+    statusUpdatedAt[normalized] = updatedAt
+  }
+  return { ...state, statuses, statusUpdatedAt }
+}
+
+export function migrateVocabularyHunterState(
   state: Omit<Partial<VocabularyHunterState>, "statuses"> & {
     statuses?: Record<string, VocabularyStatus | "learning" | "ignored">
   },
@@ -66,6 +105,7 @@ function migrateState(
   return {
     ...DEFAULT_VOCABULARY_HUNTER_STATE,
     ...state,
+    schemaVersion: VOCABULARY_HUNTER_SCHEMA_VERSION,
     enabledDictionaries:
       state.enabledDictionaries === undefined
         ? [...DEFAULT_VOCABULARY_HUNTER_STATE.enabledDictionaries]
@@ -77,9 +117,16 @@ function migrateState(
 }
 
 export async function getVocabularyHunterState() {
-  return migrateState(
-    (await storage.getItem<VocabularyHunterState>(VOCABULARY_HUNTER_STORAGE_KEY)) ?? {},
-  )
+  const stored: Partial<VocabularyHunterState> & { gistToken?: string } =
+    (await storage.getItem<VocabularyHunterState & { gistToken?: string }>(
+      VOCABULARY_HUNTER_STORAGE_KEY,
+    )) ?? {}
+  if (stored.gistToken && !(await getVocabularyHunterGistToken())) {
+    await setVocabularyHunterGistToken(stored.gistToken)
+  }
+  const { gistToken: _legacyToken, ...state } = stored
+  if (_legacyToken) await storage.setItem(VOCABULARY_HUNTER_STORAGE_KEY, state)
+  return migrateVocabularyHunterState(state)
 }
 
 export function setVocabularyHunterState(state: VocabularyHunterState) {
@@ -88,6 +135,6 @@ export function setVocabularyHunterState(state: VocabularyHunterState) {
 
 export function watchVocabularyHunterState(callback: (state: VocabularyHunterState) => void) {
   return storage.watch<VocabularyHunterState>(VOCABULARY_HUNTER_STORAGE_KEY, (next) => {
-    callback(migrateState(next ?? {}))
+    callback(migrateVocabularyHunterState(next ?? {}))
   })
 }

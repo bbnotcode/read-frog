@@ -4,6 +4,31 @@ import { browser } from "#imports"
 
 const BUCKET_SIZE = 400
 const BUCKET_PREFIX = "rf_vocabulary_known_"
+const MAX_GIST_BYTES = 4 * 1024 * 1024
+const MAX_GIST_WORDS = 100_000
+const MAX_WORD_LENGTH = 64
+const WORD_PATTERN = /^[a-z]+(?:'[a-z]+)?$/
+
+function normalizeSyncWord(value: string) {
+  const word = value.trim().toLocaleLowerCase()
+  return word.length <= MAX_WORD_LENGTH && WORD_PATTERN.test(word) ? word : undefined
+}
+
+function assertSafeResponseSize(response: Response) {
+  const length = Number(response.headers.get("content-length") ?? 0)
+  if (Number.isFinite(length) && length > MAX_GIST_BYTES) {
+    throw new Error("Gist 备份文件过大")
+  }
+}
+
+async function readLimitedText(response: Response) {
+  assertSafeResponseSize(response)
+  const text = await response.text()
+  if (new TextEncoder().encode(text).byteLength > MAX_GIST_BYTES) {
+    throw new Error("Gist 备份文件过大")
+  }
+  return text
+}
 
 export function mergeVocabularyStatusesByUpdatedAt(
   localStatuses: Record<string, VocabularyStatus>,
@@ -109,7 +134,12 @@ function parseBackupObject(text: string): Record<string, unknown> {
 export function readWordHunterBackup(text: string) {
   const parsed = parseBackupObject(text)
   if (parsed.known && typeof parsed.known === "object" && !Array.isArray(parsed.known)) {
-    return Object.keys(parsed.known)
+    const words = Object.keys(parsed.known).flatMap((word) => {
+      const normalized = normalizeSyncWord(word)
+      return normalized ? [normalized] : []
+    })
+    if (words.length > MAX_GIST_WORDS) throw new Error("Gist 中的词汇数量过多")
+    if (words.length) return words
   }
   if (parsed.files && typeof parsed.files === "object" && !Array.isArray(parsed.files)) {
     for (const file of Object.values(parsed.files as Record<string, unknown>)) {
@@ -160,7 +190,8 @@ export async function fetchWordHunterGist(gistUrlOrId: string, token?: string) {
         : `读取 Gist 失败（${response.status}）`,
     )
   }
-  const gist = (await response.json()) as {
+  assertSafeResponseSize(response)
+  const gist = JSON.parse(await readLimitedText(response)) as {
     files?: Record<string, { content?: string; raw_url?: string; truncated?: boolean }>
   }
   const files = Object.values(gist.files ?? {})
@@ -168,11 +199,20 @@ export async function fetchWordHunterGist(gistUrlOrId: string, token?: string) {
     gist.files?.["word_hunter_backup.json"] ??
     files.find((file) => file.content?.includes('"known"'))
   if (!preferred) throw new Error("该 Gist 中没有 Word Hunter 备份数据")
-  if (preferred.content && !preferred.truncated) return preferred.content
+  if (preferred.content && !preferred.truncated) {
+    if (new TextEncoder().encode(preferred.content).byteLength > MAX_GIST_BYTES) {
+      throw new Error("Gist 备份文件过大")
+    }
+    return preferred.content
+  }
   if (!preferred.raw_url) throw new Error("Gist 备份内容无法读取")
-  const rawResponse = await fetch(preferred.raw_url)
+  const rawUrl = new URL(preferred.raw_url)
+  if (rawUrl.protocol !== "https:" || rawUrl.hostname !== "gist.githubusercontent.com") {
+    throw new Error("Gist 原始备份地址不可信")
+  }
+  const rawResponse = await fetch(rawUrl)
   if (!rawResponse.ok) throw new Error("Gist 原始备份文件读取失败")
-  return rawResponse.text()
+  return readLimitedText(rawResponse)
 }
 
 export async function syncWordsToWordHunterGist(
@@ -196,28 +236,42 @@ export async function syncWordsToWordHunterGist(
         statuses?: Record<string, { status?: VocabularyStatus; updatedAt?: number }>
       }
     | undefined
-  const mergedStatuses: Record<string, { status: VocabularyStatus; updatedAt: number }> = {}
+  const mergedStatuses = Object.create(null) as Record<
+    string,
+    { status: VocabularyStatus; updatedAt: number }
+  >
   Object.keys(remoteKnown).forEach((word) => {
-    mergedStatuses[word] = { status: "known", updatedAt: 0 }
+    const normalized = normalizeSyncWord(word)
+    if (normalized) mergedStatuses[normalized] = { status: "known", updatedAt: 0 }
   })
   Object.entries(remoteReadFrog?.statuses ?? {}).forEach(([word, entry]) => {
+    const normalized = normalizeSyncWord(word)
     if (
+      normalized &&
       entry &&
       ["known", "fuzzy", "unknown"].includes(entry.status ?? "") &&
-      typeof entry.updatedAt === "number"
+      typeof entry.updatedAt === "number" &&
+      Number.isFinite(entry.updatedAt) &&
+      entry.updatedAt >= 0
     ) {
-      mergedStatuses[word] = {
+      mergedStatuses[normalized] = {
         status: entry.status as VocabularyStatus,
         updatedAt: entry.updatedAt,
       }
     }
   })
   Object.entries(localStatuses).forEach(([word, status]) => {
-    const updatedAt = localUpdatedAt[word] ?? 0
-    if (!mergedStatuses[word] || updatedAt >= mergedStatuses[word].updatedAt) {
-      mergedStatuses[word] = { status, updatedAt }
+    const normalized = normalizeSyncWord(word)
+    if (!normalized) return
+    const rawUpdatedAt = localUpdatedAt[word] ?? 0
+    const updatedAt = Number.isFinite(rawUpdatedAt) && rawUpdatedAt >= 0 ? rawUpdatedAt : 0
+    if (!mergedStatuses[normalized] || updatedAt >= mergedStatuses[normalized].updatedAt) {
+      mergedStatuses[normalized] = { status, updatedAt }
     }
   })
+  if (Object.keys(mergedStatuses).length > MAX_GIST_WORDS) {
+    throw new Error("Gist 中的词汇数量过多")
+  }
   const mergedKnown = Object.fromEntries(
     Object.entries(mergedStatuses)
       .filter(([, entry]) => entry.status === "known")

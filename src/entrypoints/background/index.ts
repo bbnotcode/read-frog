@@ -10,7 +10,6 @@ import { logger } from "@/utils/logger"
 import { onMessage } from "@/utils/message"
 import { openOptionsPage } from "@/utils/navigation"
 import { SessionCacheGroupRegistry } from "@/utils/session-cache/session-cache-group-registry"
-import { syncWordsToWordHunterGist } from "@/utils/vocabulary-hunter/sync"
 import { runAiSegmentSubtitles } from "./ai-segmentation"
 import { setupAnalyticsMessageHandlers } from "./analytics"
 import { dispatchBackgroundStreamPort } from "./background-stream"
@@ -36,7 +35,11 @@ import { setUpSubtitlesTranslationQueue, setUpWebPageTranslationQueue } from "./
 import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
-import { setupVocabularyGistAutoSync } from "./vocabulary-gist-sync"
+import {
+  runVocabularyGistSync,
+  setupVocabularyGistAutoSync,
+  updateVocabularyWord,
+} from "./vocabulary-gist-sync"
 
 export default defineBackground({
   type: "module",
@@ -80,13 +83,9 @@ export default defineBackground({
       await openOptionsPage(message.data)
     })
 
-    onMessage("syncVocabularyGist", async (message) =>
-      syncWordsToWordHunterGist(
-        message.data.gistId,
-        message.data.token,
-        message.data.statuses,
-        message.data.updatedAt,
-      ),
+    onMessage("syncVocabularyGist", async () => ({ ok: await runVocabularyGistSync() }))
+    onMessage("updateVocabularyWord", async (message) =>
+      updateVocabularyWord(message.data.word, message.data.status, message.data.updatedAt),
     )
 
     setupSidePanelMessageHandler({

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/base-ui/button"
 import { Input } from "@/components/ui/base-ui/input"
 import { Switch } from "@/components/ui/base-ui/switch"
+import { sendMessage } from "@/utils/message"
 import {
   getVocabularyLevel,
   loadVocabularyDictionary,
@@ -15,7 +16,9 @@ import {
 } from "@/utils/vocabulary-hunter/dictionary-lookup"
 import {
   DEFAULT_VOCABULARY_HUNTER_STATE,
+  getVocabularyHunterGistToken,
   getVocabularyHunterState,
+  setVocabularyHunterGistToken,
   setVocabularyHunterState,
   type VocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
@@ -211,18 +214,20 @@ export function VocabularyHunterPage() {
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    void Promise.all([getVocabularyHunterState(), loadVocabularyDictionary()]).then(
-      async ([currentState, loadedDictionary]) => {
-        setDictionary(loadedDictionary)
-        const mergedState = await mergeKnownWordsFromSync(currentState, loadedDictionary).catch(
-          () => currentState,
-        )
-        setState(mergedState)
-        setGistUrl(mergedState.gistId)
-        setGistToken(mergedState.gistToken)
-        if (mergedState !== currentState) await setVocabularyHunterState(mergedState)
-      },
-    )
+    void Promise.all([
+      getVocabularyHunterState(),
+      getVocabularyHunterGistToken(),
+      loadVocabularyDictionary(),
+    ]).then(async ([currentState, savedGistToken, loadedDictionary]) => {
+      setDictionary(loadedDictionary)
+      const mergedState = await mergeKnownWordsFromSync(currentState, loadedDictionary).catch(
+        () => currentState,
+      )
+      setState(mergedState)
+      setGistUrl(mergedState.gistId)
+      setGistToken(savedGistToken)
+      if (mergedState !== currentState) await setVocabularyHunterState(mergedState)
+    })
   }, [])
 
   const updateState = (next: VocabularyHunterState) => {
@@ -339,21 +344,24 @@ export function VocabularyHunterPage() {
     })
   }, [state.statusUpdatedAt, state.statuses])
 
-  const removeWord = (word: string) => {
+  const removeWord = async (word: string) => {
     const statuses = { ...state.statuses }
     const statusUpdatedAt = { ...state.statusUpdatedAt }
     delete statuses[word]
     delete statusUpdatedAt[word]
-    updateState({ ...state, statuses, statusUpdatedAt })
+    setState({ ...state, statuses, statusUpdatedAt })
+    await sendMessage("updateVocabularyWord", { word, status: null, updatedAt: Date.now() })
     void syncKnownWord(word, false, dictionary)
   }
 
-  const updateWordStatus = (word: string, status: VocabularyStatus) => {
-    updateState({
+  const updateWordStatus = async (word: string, status: VocabularyStatus) => {
+    const updatedAt = Date.now()
+    setState({
       ...state,
       statuses: { ...state.statuses, [word]: status },
-      statusUpdatedAt: { ...state.statusUpdatedAt, [word]: Date.now() },
+      statusUpdatedAt: { ...state.statusUpdatedAt, [word]: updatedAt },
     })
+    await sendMessage("updateVocabularyWord", { word, status, updatedAt })
     void syncKnownWord(word, status === "known", dictionary)
   }
 
@@ -423,12 +431,12 @@ export function VocabularyHunterPage() {
         statuses,
         statusUpdatedAt,
         gistId: gistUrl.trim(),
-        gistToken: gistToken.trim(),
         gistAutoSync: true,
         gistLastSyncAt: Date.now(),
         gistLastSyncCount: result.count,
         gistSyncError: "",
       }
+      await setVocabularyHunterGistToken(gistToken)
       updateState(nextState)
       setSyncMessage(`同步成功：Gist 中共有 ${result.count} 个已掌握单词，自动同步已开启`)
     } catch (error) {
@@ -674,7 +682,7 @@ export function VocabularyHunterPage() {
               </span>
               <Switch
                 checked={state.gistAutoSync}
-                disabled={!state.gistToken || !state.gistId}
+                disabled={!gistToken.trim() || !state.gistId}
                 onCheckedChange={(gistAutoSync) => updateState({ ...state, gistAutoSync })}
               />
             </label>

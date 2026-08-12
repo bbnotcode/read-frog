@@ -27,11 +27,7 @@ import {
   type VocabularyDictionary,
   watchVocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
-import {
-  mergeKnownWordsFromSync,
-  mergeVocabularyStatusesByUpdatedAt,
-  syncKnownWord,
-} from "@/utils/vocabulary-hunter/sync"
+import { mergeKnownWordsFromSync, syncKnownWord } from "@/utils/vocabulary-hunter/sync"
 import {
   type ExternalCustomActionResult,
   EXTERNAL_CUSTOM_ACTION_RESULT_EVENT,
@@ -368,48 +364,12 @@ async function start(ctx: ContentScriptContext) {
 
   const scheduleGistAutoSync = () => {
     clearTimeout(gistSyncTimer)
-    if (!state.gistAutoSync || !state.gistId || !state.gistToken) return
+    if (!state.gistAutoSync || !state.gistId) return
     gistSyncTimer = setTimeout(async () => {
-      const currentState = await getVocabularyHunterState()
-      if (!currentState.gistAutoSync || !currentState.gistId || !currentState.gistToken) return
       try {
-        const synced = await sendMessage("syncVocabularyGist", {
-          gistId: currentState.gistId,
-          token: currentState.gistToken,
-          statuses: currentState.statuses,
-          updatedAt: currentState.statusUpdatedAt,
-        })
-        const statuses: VocabularyHunterState["statuses"] = {}
-        const statusUpdatedAt: Record<string, number> = {}
-        Object.entries(synced.statuses).forEach(([word, status]) => {
-          const lemma =
-            vocabularyDictionary?.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase()
-          statuses[lemma] = status
-          statusUpdatedAt[lemma] = synced.updatedAt[word] ?? 0
-        })
-        const latestState = await getVocabularyHunterState()
-        const merged = mergeVocabularyStatusesByUpdatedAt(
-          latestState.statuses,
-          latestState.statusUpdatedAt,
-          statuses,
-          statusUpdatedAt,
-        )
-        state = {
-          ...latestState,
-          statuses: merged.statuses,
-          statusUpdatedAt: merged.updatedAt,
-          gistLastSyncAt: Date.now(),
-          gistLastSyncCount: synced.count,
-          gistSyncError: "",
-        }
-        await setVocabularyHunterState(state)
-      } catch (error) {
-        const latestState = await getVocabularyHunterState()
-        state = {
-          ...latestState,
-          gistSyncError: error instanceof Error ? error.message : "自动同步失败",
-        }
-        await setVocabularyHunterState(state)
+        await sendMessage("syncVocabularyGist", undefined)
+      } catch {
+        // The background coordinator records sync errors in extension storage.
       }
     }, 4000)
   }
@@ -840,6 +800,7 @@ async function start(ctx: ContentScriptContext) {
     preferredRange?: Range,
     level?: VocabularyLevel,
   ) => {
+    const updatedAt = Date.now()
     state = {
       ...state,
       statuses: {
@@ -848,7 +809,7 @@ async function start(ctx: ContentScriptContext) {
       },
       statusUpdatedAt: {
         ...state.statusUpdatedAt,
-        [word]: Date.now(),
+        [word]: updatedAt,
       },
     }
 
@@ -877,7 +838,8 @@ async function start(ctx: ContentScriptContext) {
       if (status === "fuzzy") fuzzyHighlight.add(preferredRange)
       else unknownHighlight.add(preferredRange)
     }
-    await save()
+    const update = await sendMessage("updateVocabularyWord", { word, status, updatedAt })
+    if (!update.applied) state = await getVocabularyHunterState()
     if (vocabularyDictionary) {
       void syncKnownWord(word, status === "known", vocabularyDictionary)
     }

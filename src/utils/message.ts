@@ -137,16 +137,12 @@ interface ProtocolMap {
   aiSegmentSubtitles: (data: { jsonContent: string; providerId: string }) => Promise<string>
   // network proxy
   backgroundFetch: (data: ProxyRequest) => Promise<ProxyResponse>
-  syncVocabularyGist: (data: {
-    gistId: string
-    token: string
-    statuses: Record<string, "known" | "fuzzy" | "unknown">
-    updatedAt: Record<string, number>
-  }) => Promise<{
-    count: number
-    statuses: Record<string, "known" | "fuzzy" | "unknown">
-    updatedAt: Record<string, number>
-  }>
+  syncVocabularyGist: () => Promise<{ ok: boolean }>
+  updateVocabularyWord: (data: {
+    word: string
+    status: "known" | "fuzzy" | "unknown" | null
+    updatedAt: number
+  }) => Promise<{ applied: boolean }>
   // cache management
   clearAllTranslationRelatedCache: () => Promise<void>
   clearAiSegmentationCache: () => Promise<void>

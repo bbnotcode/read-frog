@@ -38,6 +38,21 @@ describe("readWordHunterBackup", () => {
     ).toEqual(["activity", "workflow"])
   })
 
+  it("filters unsafe and non-word keys from known data", () => {
+    expect(
+      readWordHunterBackup(
+        JSON.stringify({
+          known: {
+            Activity: "o",
+            "not a word": "o",
+            __proto__: "o",
+            ["x".repeat(65)]: "o",
+          },
+        }),
+      ),
+    ).toEqual(["activity"])
+  })
+
   it("reads a downloaded Gist response and legacy word map", () => {
     const gist = {
       files: {
