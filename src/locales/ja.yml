@@ -132,12 +132,29 @@ options:
     configTitle: プロバイダー設定
     addProvider: プロバイダーを追加
     builtInProvider: 組み込みプロバイダー
+    builtInAiUsage:
+      title: 組み込み AI クォータ
+      remaining: "残り $1%"
+      supportedFeatures: "$1 つの機能に対応"
+      resetsAt: "$1 にリセット"
+      daily: 日次クォータ
+      weekly: 週間クォータ
+      features:
+        pageTranslation: ページ翻訳
+        customAction: カスタム AI アクション
+        noteSuggestion: ノートの提案
+        selectionTranslation: 選択範囲の翻訳
+        videoSubtitles: 動画字幕
+        inputTranslation: 入力翻訳
+        languageDetection: 言語検出
     sponsorCta: 高速で高コスパのAIを入手
+    sponsorCtaJalapenoCloud: GLM 5.2 を 50% オフで入手
     setApiKeyWarning:
       message: API キーは $1 ページで設定してください
     badges:
       featureCount: $1 件の機能
       sponsor: スポンサー
+      sponsorJalapenoCloud: $$2 無料
     dialog:
       title: 新しいプロバイダーを追加
       groups:
@@ -166,6 +183,7 @@ options:
         confirm: 削除
         cancel: キャンセル
       atLeastOneLLMProvider: 最低1つのLLM翻訳プロバイダーが必要です。
+      featureWouldLoseProvider: "削除できません:「$1」を実行できるプロバイダーがなくなります。"
       duplicateProviderName: '重複するプロバイダー名 "$1"'
       defaultProvider:
         translate: デフォルト翻訳プロバイダーに設定
@@ -211,10 +229,12 @@ options:
     providers:
       name:
         builtInAi: 組み込み AI
+        builtInAiAdvance: 高度な組み込み AI
         customChatComplete: カスタム Chat Complete
         customResponses: カスタム Responses
       attribution:
-        builtInAi: Atlas Cloud 提供。現在はカスタム AI アクションでのみ利用できます。無制限の体験を利用するには、公式サイトで高コスパのクレジットを購入してください。
+        builtInAi: Read Frog がホストする標準モデル。Ultra 以外のユーザーはカスタム AI アクションでのみ利用でき、Ultra ユーザーはより多くの機能で利用できます。
+        builtInAiAdvance: Read Frog がホストする高性能モデルで、Ultra メンバー専用です。ページ翻訳やカスタム AI アクションなど、すべての組み込み AI 機能で利用でき、週間クォータを共有します。標準モデルよりクォータの消費が速くなります。
       description:
         openai: GPT-4oなどのモデルを提供
         azure: Azure のデプロイ経由で OpenAI モデルを利用
@@ -225,6 +245,7 @@ options:
         anthropic: 安全性と推論能力に優れたClaudeモデル
         xai: リアルタイムデータアクセス可能なGrokモデルを提供するイーロン・マスクのAI企業
         atlascloud: DeepSeek、Kimi、Qwen、Doubao、GLMなどの新しめのモデルにOpenAI互換でアクセスできる統合プラットフォーム
+        jalapenocloud: トップの LLM 開発チームが信頼するエンタープライズ級 AI を、あなたにも
         siliconflow: 中国および国際モデル向けの高性能推論プラットフォーム
         tensdaq: 革命的入札型AI MaaSプラットフォーム、市場の需給で価格が決まり高コスト固定料金を排除
         openaiCompatible: OpenAI Chat Completions API 互換のカスタムエンドポイントに接続
@@ -249,6 +270,7 @@ options:
         huggingface: Hugging Face推論API、数千のオープンソースモデルへのアクセスを提供
     apiKey:
       showAPIKey: APIキーを表示
+      getAPIKey: APIキーを取得
     howToConfigure: 設定方法は?
     testConnection:
       button: 接続テスト
@@ -260,18 +282,20 @@ options:
       title: 機能プロバイダー
       description: 各機能に使用するプロバイダーを選択
       features:
-        translate: ページ翻訳
-        selectionToolbar_translate: 選択ツールバー翻訳
+        pageTranslation: ページ翻訳
+        selectionTranslation: 選択ツールバー翻訳
         inputTranslation: 入力翻訳
         videoSubtitles: 動画字幕
+        noteSuggestion: ノートの提案
       descriptions:
-        translate: ページ全体を対訳または置き換えで翻訳します。
-        selectionToolbar_translate: 選択ツールバーから、選択したテキストを翻訳します。
+        pageTranslation: ページ全体を対訳または置き換えで翻訳します。
+        selectionTranslation: 選択ツールバーから、選択したテキストを翻訳します。
         inputTranslation: 入力欄に書いた文章を、送信する前に翻訳します。
         videoSubtitles: 動画プレーヤーに表示される字幕を翻訳します。
+        noteSuggestion: 選択テキストを翻訳した後、Notebase に保存する価値のある単語を提案します。
     languageDetection:
       title: 言語検出
-      description: 自動翻訳の言語検出、スキップ言語検出、読み上げの音声選択精度に影響します。
+      description: 自動翻訳の言語検出と読み上げの音声選択精度に影響します。
       mode:
         basic: 基本
         llm: LLM
@@ -533,11 +557,13 @@ options:
       speak:
         title: 読み上げ
         description: 選択したテキストを読み上げる読み上げボタンをツールバーに表示します
-      saveSuggestion:
-        title: 保存の提案
+      noteSuggestion:
+        title: ノートの提案
         description: AI プロバイダーで選択テキストを翻訳した後、Notebase に保存する単語を提案します
         action: アクション
         actionDescription: 保存候補を生成するアクション
+        provider: プロバイダー
+        providerDescription: 保存候補を生成する AI プロバイダー
     display:
       title: 表示
       opacity:
@@ -927,13 +953,18 @@ options:
         description: AI が字幕を文として読める形に切り直します。タイミングも AI が決めるため、字幕がずれることがあります。LLM 翻訳プロバイダーが必要です。
     aiQuota:
       title: AI字幕の利用枠
-      description: 今月のAI字幕文字起こし利用枠の使用状況
+      description: AIの音声認識で、どんな動画にも正確な字幕を生成します
+      launchBonusPromo: $1 までに加入すると、文字起こし 300 分を追加でプレゼント
       loginRequired: ログインしてAI字幕の利用枠を確認
-      logIn: ログイン
-      betaRequired: AI字幕はベータ版で、まだあなたのアカウントでは利用できません
-      betaApply: 利用を申請
+      upgradeRequired: AI字幕には Pro または Ultra プランが必要です
+      pools:
+        subscription: 月間クォータ
+        launchBonus: リリース記念ギフト
+      resetsOn: $1 にリセット
+      expiresOn: $1 に失効
       loadError: 利用枠を読み込めませんでした。しばらくしてから再試行してください。
-      summary: $2 分中 $1 分を使用、残り $3 分
+      remainingOf: 残り $1 / $2 分
+      used: 使用済み $1 分
     style:
       title: 字幕スタイル
       description: 表示モード・位置・フォント・色・背景を、プレビューを見ながら設定します
@@ -1077,6 +1108,7 @@ action:
   saveToNotebasePendingLoginDescription: ログイン後、Read Frog が Notebase を作成し、この結果を自動で保存します。
   saveToNotebasePendingConnectedLoginDescription: ログイン後、Read Frog は可能であれば接続済み Notebase に保存します。このアカウントで利用できない場合は、新しい Notebase を作成して保存します。
   upgrade: アップグレード
+  updatePayment: 支払いを更新
   openCustomActions: Custom AI Actions を開く
   openNotebase: Notebase を開く
   contextDetailsTitleLabel: タイトル
@@ -1084,13 +1116,13 @@ action:
   translation: 翻訳
   speak: 読み上げ
   playing: 再生中
-saveSuggestion:
+noteSuggestion:
   title: 保存におすすめ
-  description: 以下の単語を Notebase に保存して、いつでも復習できます。
+  description: Notebase に保存したい単語を選んで、いつでも復習できます。
   save: 保存
   saved: 保存済み
   staleSuggestion: この提案は古くなっています
-  toggleLabel: 保存の提案を表示
+  toggleLabel: ノートの提案を表示
 thinking:
   label: 思考中
   complete: 思考完了
@@ -1100,7 +1132,7 @@ shortcutKeySelector:
   placeholder: ショートカットを入力してください
 subtitles:
   loadingAiSubtitles: AI字幕を読み込み中…（推定3分）
-  requestAiSubtitles: AI字幕をリクエスト（Beta）
+  requestAiSubtitles: AI字幕をリクエスト
   usingAiSubtitles: AI字幕を使用中
   toggle:
     enabled: 字幕翻訳をオンにしました
@@ -1132,16 +1164,31 @@ subtitles:
     aiAuthFailed: API認証に失敗しました。APIキーを確認してください
     aiServiceUnavailable: 翻訳サービスは一時的に利用できません
     aiQuotaExceeded: 今月のAI字幕の利用枠を使い切りました
+    aiQuotaExceededWithReset: 今月のAI字幕の利用枠を使い切りました・$1 にリセット
+    aiLoginRequired: ログインしてAI字幕の利用枠を確認
+    aiSubscriptionRequired: AI字幕には Pro または Ultra プランが必要です
+    aiPaymentRequired: AI字幕の生成を続けるにはお支払い方法を更新してください
+    aiVideoTooLong: この動画は長すぎるためAI字幕を生成できません
+    aiStillProcessing: 文字起こしは進行中です。数分後にもう一度クリックしてください
     aiRequestFailed: AI字幕のリクエストに失敗しました。しばらくしてから再試行してください
     aiNoResponse: AIサービスが応答しませんでした。原文を表示します
     translatedExportFailed: 翻訳字幕の生成に失敗しました
     translatedExportIncomplete: すべての字幕行を翻訳できませんでした
     translatedExportSameLanguage: 元の言語と翻訳先の言語が同じです
 hostedAi:
+  ultraBadge:
+    tooltip: Ultra プランへの加入が必要です · バッジをクリックしてプランを取得
+  availability:
+    authenticationRequired: ログインすると利用できます
+    ultraRequired: Ultra プランが必要です
+    quotaExhausted: 利用枠を使い切りました
+    serviceUnavailable: 一時的に利用できません
+    usedPercent: "利用枠: $1% 使用済み"
+    resetsAt: "$1 にリセット"
   errors:
     rateLimited: リクエストが多すぎます。後でもう一度お試しください。
-    guestRateLimited: ゲストの上限に達しました。ログインすると無料 AI リクエストをさらに利用できます。
-    userRateLimited: リクエストが多すぎます。無料利用枠の上限を超えました。後でもう一度お試しください。
+    guestRateLimited: ゲストからのリクエストが多すぎます。後でもう一度お試しください。
+    userRateLimited: リクエストが多すぎます。後でもう一度お試しください。
 hotkey:
   control: Ctrl
   alt: Option

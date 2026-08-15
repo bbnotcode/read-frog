@@ -132,12 +132,29 @@ options:
     configTitle: Sağlayıcı yapılandırması
     addProvider: Sağlayıcı ekle
     builtInProvider: Yerleşik sağlayıcı
+    builtInAiUsage:
+      title: Yerleşik AI kotası
+      remaining: "%$1 kaldı"
+      supportedFeatures: "$1 özelliği destekler"
+      resetsAt: "$1 tarihinde sıfırlanır"
+      daily: Günlük kota
+      weekly: Haftalık kota
+      features:
+        pageTranslation: Sayfa çevirisi
+        customAction: Özel AI eylemleri
+        noteSuggestion: Not önerileri
+        selectionTranslation: Seçim çevirisi
+        videoSubtitles: Video altyazıları
+        inputTranslation: Giriş çevirisi
+        languageDetection: Dil algılama
     sponsorCta: Hızlı ve uygun maliyetli yapay zekâ al
+    sponsorCtaJalapenoCloud: GLM 5.2ʼde %50 indirim al
     setApiKeyWarning:
       message: API anahtarınızı $1 sayfasında ayarlayın
     badges:
       featureCount: $1 özellik
       sponsor: Sponsor
+      sponsorJalapenoCloud: $$2 ücretsiz
     dialog:
       title: Yeni sağlayıcı ekle
       groups:
@@ -166,6 +183,7 @@ options:
         confirm: Sil
         cancel: İptal
       atLeastOneLLMProvider: En az bir LLM çeviri sağlayıcısı gereklidir.
+      featureWouldLoseProvider: 'Silinemiyor: "$1" özelliğini çalıştırabilecek hiçbir sağlayıcı kalmayacak.'
       duplicateProviderName: 'Yinelenen sağlayıcı adı "$1"'
       defaultProvider:
         translate: Varsayılan çeviri sağlayıcısı olarak ayarla
@@ -211,10 +229,12 @@ options:
     providers:
       name:
         builtInAi: Yerleşik AI
+        builtInAiAdvance: Gelişmiş yerleşik AI
         customChatComplete: Özel Chat Complete
         customResponses: Özel Responses
       attribution:
-        builtInAi: Atlas Cloud tarafından sağlanır. Şu anda yalnızca özel AI eylemleri için kullanılabilir. Sınırsız deneyimin kilidini açmak için resmi web sitesinden uygun maliyetli kredi satın alabilirsiniz.
+        builtInAi: Read Frog tarafından barındırılan standart model. Ultra olmayan kullanıcılar yalnızca özel AI eylemlerinde kullanabilir; Ultra kullanıcıları daha fazla özellikte kullanabilir.
+        builtInAiAdvance: Read Frog tarafından barındırılan gelişmiş model, yalnızca Ultra üyelerine özeldir. Sayfa çevirisi, özel AI eylemleri ve diğer tüm yerleşik AI özelliklerinde çalışır; haftalık kota ortaktır. Kotayı standart modelden daha hızlı tüketir.
       description:
         openai: GPT-4o gibi modeller sağlar
         azure: Azure dağıtımlarınız üzerinden OpenAI modelleri
@@ -225,6 +245,7 @@ options:
         anthropic: Güvenlik ve akıl yürütme mükemmelliğiyle tanınan Claude modelleri
         xai: Gerçek zamanlı veri erişimli Grok modelleri sunan Elon Musk'ın AI şirketi
         atlascloud: DeepSeek, Kimi, Qwen, Doubao ve GLM gibi yeni modellere OpenAI uyumlu birleşik erişim platformu
+        jalapenocloud: Önde gelen LLM geliştiricilerinin güvendiği kurumsal düzeyde yapay zekâ, artık sizin için
         siliconflow: Çin ve uluslararası modeller için yüksek performanslı çıkarım platformu
         tensdaq: Yüksek maliyetli sabit fiyatlandırmayı ortadan kaldıran pazar odaklı fiyatlandırma ile devrimci açık artırma AI MaaS platformu
         openaiCompatible: OpenAI Chat Completions API ile uyumlu özel bir uç noktaya bağlanın
@@ -249,6 +270,7 @@ options:
         huggingface: Binlerce açık kaynak modele erişim sağlayan Hugging Face Çıkarım API'si
     apiKey:
       showAPIKey: API anahtarını göster
+      getAPIKey: API anahtarı al
     howToConfigure: Nasıl yapılandırılır?
     testConnection:
       button: Bağlantıyı test et
@@ -260,18 +282,20 @@ options:
       title: Özellik sağlayıcıları
       description: Her özellik için kullanılacak sağlayıcıyı seçin
       features:
-        translate: Sayfa çevirisi
-        selectionToolbar_translate: Seçim araç çubuğu çevirisi
+        pageTranslation: Sayfa çevirisi
+        selectionTranslation: Seçim araç çubuğu çevirisi
         inputTranslation: Giriş çevirisi
         videoSubtitles: Video altyazıları
+        noteSuggestion: Not önerileri
       descriptions:
-        translate: Sayfanın tamamını iki dilli ya da değiştirme modunda çevirir.
-        selectionToolbar_translate: Seçim araç çubuğundan, seçtiğiniz metni çevirir.
+        pageTranslation: Sayfanın tamamını iki dilli ya da değiştirme modunda çevirir.
+        selectionTranslation: Seçim araç çubuğundan, seçtiğiniz metni çevirir.
         inputTranslation: Bir metin kutusuna yazdıklarınızı göndermeden önce çevirir.
         videoSubtitles: Video oynatıcıda görünen altyazıları çevirir.
+        noteSuggestion: Seçim çevirisinden sonra Notebase'inize kaydetmeye değer kelimeler önerir.
     languageDetection:
       title: Dil algılama
-      description: Otomatik çeviri dil algılama, atlama dil algılama ve Konuşma ses seçimi doğruluğunu etkiler.
+      description: Otomatik çeviri dil algılama ve Konuşma ses seçimi doğruluğunu etkiler.
       mode:
         basic: Temel
         llm: LLM
@@ -533,11 +557,13 @@ options:
       speak:
         title: Sesli okuma
         description: Seçili metni sesli okuyan seslendirme düğmesini araç çubuğunda göster
-      saveSuggestion:
-        title: Kaydetme önerileri
+      noteSuggestion:
+        title: Not önerileri
         description: Bir yapay zekâ sağlayıcısıyla seçim çevirisinden sonra Notebase'inize kaydedilecek kelimeler önerilir
         action: Eylem
         actionDescription: Öneriyi üreten eylem
+        provider: Sağlayıcı
+        providerDescription: Öneriyi üreten yapay zekâ sağlayıcısı
     display:
       title: Görünüm
       opacity:
@@ -927,13 +953,18 @@ options:
         description: Yapay zekâ altyazıları cümle gibi okunan satırlara yeniden böler. Zamanlamayı da kendisi belirlediği için satırlar kayabilir. LLM çeviri sağlayıcısı gerekir.
     aiQuota:
       title: Yapay zekâ altyazı kotası
-      description: Yapay zeka altyazı deşifre kotanızın aylık kullanımı
+      description: Yapay zeka konuşma tanıma ile her video için doğru altyazı üretir
+      launchBonusPromo: $1 tarihinden önce abone olun, 300 dakika ek deşifre hediyesi kazanın
       loginRequired: Yapay zeka altyazı kotanızı görmek için giriş yapın
-      logIn: Giriş yap
-      betaRequired: Yapay zeka altyazıları beta aşamasında ve hesabınız için henüz etkin değil
-      betaApply: Erişim başvurusu yap
+      upgradeRequired: Yapay zeka altyazıları için Pro veya Ultra aboneliği gerekir
+      pools:
+        subscription: Aylık kota
+        launchBonus: Lansman hediyesi
+      resetsOn: $1 tarihinde sıfırlanır
+      expiresOn: $1 tarihinde sona erer
       loadError: Kotanız yüklenemedi. Lütfen daha sonra tekrar deneyin.
-      summary: $2 dakikanın $1 dakikası kullanıldı, $3 kaldı
+      remainingOf: $1 / $2 dk kaldı
+      used: $1 dk kullanıldı
     style:
       title: Altyazı stili
       description: Görüntüleme modu, konum, yazı tipleri, renkler ve arka plan — canlı önizlemeye bakarak ayarlanır
@@ -1077,6 +1108,7 @@ action:
   saveToNotebasePendingLoginDescription: Giriş yaptıktan sonra Read Frog Notebase'i oluşturur ve bu sonucu otomatik olarak kaydeder.
   saveToNotebasePendingConnectedLoginDescription: Girişten sonra Read Frog mümkünse bağlı Notebase'e kaydeder. Bu hesap onu kullanamazsa yeni bir Notebase oluşturup kaydeder.
   upgrade: Yükselt
+  updatePayment: Ödemeyi güncelle
   openCustomActions: Custom AI Actions'ı aç
   openNotebase: Notebase'i aç
   contextDetailsTitleLabel: Başlık
@@ -1084,13 +1116,13 @@ action:
   translation: Çeviri
   speak: Oku
   playing: Çalınıyor
-saveSuggestion:
+noteSuggestion:
   title: Kaydetmek isteyebilirsiniz
-  description: Bu kelimeleri Notebase'inize kaydedin, istediğiniz zaman tekrar edin.
+  description: Notebase'inize kaydetmek istediğiniz kelimeleri seçin ve dilediğiniz zaman tekrarlayın.
   save: Kaydet
   saved: Kaydedildi
   staleSuggestion: Bu öneri güncelliğini yitirdi
-  toggleLabel: Kaydetme önerilerini göster
+  toggleLabel: Not önerilerini göster
 thinking:
   label: Düşünüyor
   complete: Düşünme tamamlandı
@@ -1100,7 +1132,7 @@ shortcutKeySelector:
   placeholder: Lütfen kısayolu girin
 subtitles:
   loadingAiSubtitles: Yapay zeka altyazıları yükleniyor… (tahmini 3 dk)
-  requestAiSubtitles: Yapay zeka altyazısı iste (Beta)
+  requestAiSubtitles: Yapay zeka altyazısı iste
   usingAiSubtitles: Yapay zeka altyazısı kullanılıyor
   toggle:
     enabled: Altyazı çevirisi açık
@@ -1132,16 +1164,31 @@ subtitles:
     aiAuthFailed: API kimlik doğrulaması başarısız, lütfen API anahtarınızı kontrol edin
     aiServiceUnavailable: Çeviri hizmeti geçici olarak kullanılamıyor
     aiQuotaExceeded: Aylık yapay zeka altyazı kotanız doldu
+    aiQuotaExceededWithReset: Aylık yapay zeka altyazı kotanız doldu · $1 tarihinde sıfırlanır
+    aiLoginRequired: Yapay zeka altyazı kotanızı görmek için giriş yapın
+    aiSubscriptionRequired: Yapay zeka altyazıları için Pro veya Ultra aboneliği gerekir
+    aiPaymentRequired: Yapay zeka altyazıları oluşturmaya devam etmek için ödeme yönteminizi güncelleyin
+    aiVideoTooLong: Bu video yapay zeka altyazıları için çok uzun
+    aiStillProcessing: Yazıya dökme hâlâ sürüyor — birkaç dakika sonra tekrar tıklayın
     aiRequestFailed: Yapay zeka altyazı isteği başarısız oldu, lütfen daha sonra tekrar deneyin
     aiNoResponse: AI hizmeti yanıt vermedi, orijinal metin gösteriliyor
     translatedExportFailed: Çevrilmiş altyazılar oluşturulamadı
     translatedExportIncomplete: Tüm altyazı satırları çevrilemedi
     translatedExportSameLanguage: Kaynak ve hedef diller aynı
 hostedAi:
+  ultraBadge:
+    tooltip: Ultra plan gerektirir · Planı almak için rozete tıklayın
+  availability:
+    authenticationRequired: Bu sağlayıcıyı kullanmak için giriş yapın
+    ultraRequired: Ultra plan gerekli
+    quotaExhausted: Kota tükendi
+    serviceUnavailable: Geçici olarak kullanılamıyor
+    usedPercent: "Kota kullanımı: %$1"
+    resetsAt: "$1'de sıfırlanır"
   errors:
     rateLimited: Çok fazla istek, lütfen daha sonra tekrar deneyin.
-    guestRateLimited: Misafir sınırına ulaşıldı. Daha fazla ücretsiz AI isteği için giriş yapın.
-    userRateLimited: Çok fazla istek. Ücretsiz kullanım sınırını aştınız, lütfen daha sonra tekrar deneyin.
+    guestRateLimited: Çok fazla misafir isteği. Lütfen daha sonra tekrar deneyin.
+    userRateLimited: Çok fazla istek. Lütfen daha sonra tekrar deneyin.
 hotkey:
   control: Ctrl
   alt: Option

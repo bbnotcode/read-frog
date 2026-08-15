@@ -1,6 +1,7 @@
+import type { SerializableProviderRef } from "@/utils/providers/provider-ref"
 import type { SubtitlesFragment } from "@/utils/subtitles/types"
-import { getLocalConfig } from "@/utils/config/storage"
 import { PROCESS_LOOK_AHEAD_MS } from "@/utils/constants/subtitles"
+import { effectiveLookAheadMs } from "@/utils/subtitles/lookahead"
 import { aiSegmentBlock } from "@/utils/subtitles/processor/ai-segmentation"
 import { optimizeSubtitles } from "@/utils/subtitles/processor/optimizer"
 
@@ -23,12 +24,21 @@ export class SegmentationPipeline {
   private getSourceLanguage: () => string
   private preSegmented: boolean
   private onChunkSegmented: ChunkSegmentedHandler | null
+  /**
+   * Resolved once per session by the adapter, so segmentation does not pay a
+   * hostedAi.status round trip per block. Null means AI segmentation cannot
+   * run (no provider, or the hosted tier was unavailable when the session
+   * started); chunks then fall back to rule-based optimization until a new
+   * session resolves a fresh ref.
+   */
+  private providerRef: SerializableProviderRef | null
 
   constructor(options: {
     baselineFragments?: SubtitlesFragment[]
     rawFragments: SubtitlesFragment[]
     getVideoElement: () => HTMLVideoElement | null
     getSourceLanguage: () => string
+    providerRef: SerializableProviderRef | null
     preSegmented?: boolean
     onChunkSegmented?: ChunkSegmentedHandler
   }) {
@@ -36,6 +46,7 @@ export class SegmentationPipeline {
     this.processedFragments = [...(options.baselineFragments ?? [])]
     this.getVideoElement = options.getVideoElement
     this.getSourceLanguage = options.getSourceLanguage
+    this.providerRef = options.providerRef
     this.preSegmented = options.preSegmented ?? false
     this.onChunkSegmented = options.onChunkSegmented ?? null
   }
@@ -101,21 +112,15 @@ export class SegmentationPipeline {
       return true
     }
 
-    try {
-      const config = await getLocalConfig()
-      if (this.stopped) {
-        // Re-queue: starts were marked segmented before await; allow retry after resume.
-        chunk.forEach((f) => this.segmentedRawStarts.delete(f.start))
-        return true
-      }
-      if (!config) {
-        // Do not leave starts marked segmented with no replacement (would skip forever).
-        const optimized = optimizeSubtitles(chunk, this.getSourceLanguage())
-        this.replaceProcessedChunk(chunk, optimized)
-        return true
-      }
+    if (!this.providerRef) {
+      // Do not leave starts marked segmented with no replacement (would skip forever).
+      const optimized = optimizeSubtitles(chunk, this.getSourceLanguage())
+      this.replaceProcessedChunk(chunk, optimized)
+      return true
+    }
 
-      const segmented = await aiSegmentBlock(chunk, config)
+    try {
+      const segmented = await aiSegmentBlock(chunk, this.providerRef)
       // Session may have been torn down while the AI call was in flight.
       if (this.stopped) {
         chunk.forEach((f) => this.segmentedRawStarts.delete(f.start))
@@ -167,9 +172,13 @@ export class SegmentationPipeline {
     // eagerly sends the entire remaining video to the AI segmentation model.
     // Chunks further ahead are picked up later, once playback advances and the
     // translation coordinator restarts the pipeline.
-    if (firstUnprocessed.start > currentTimeMs + PROCESS_LOOK_AHEAD_MS) return []
+    const lookAheadMs = effectiveLookAheadMs(
+      PROCESS_LOOK_AHEAD_MS,
+      this.getVideoElement()?.playbackRate,
+    )
+    if (firstUnprocessed.start > currentTimeMs + lookAheadMs) return []
 
-    const windowEnd = firstUnprocessed.start + PROCESS_LOOK_AHEAD_MS
+    const windowEnd = firstUnprocessed.start + lookAheadMs
     return this.rawFragments.filter(
       (f) =>
         f.start >= firstUnprocessed.start &&

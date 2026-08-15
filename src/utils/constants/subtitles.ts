@@ -14,6 +14,7 @@ export const SENTENCE_END_PATTERN = /[,.。?？！!；;…؟۔\n]$/
 export const TRANSLATION_BATCH_SIZE = 5
 export const TRANSLATE_LOOK_AHEAD_MS = 30_000
 export const PROCESS_LOOK_AHEAD_MS = 60_000
+export const MAX_LOOKAHEAD_RATE = 4
 
 // DOM IDs
 export const READ_FROG_SUBTITLES_UI_HOST_ID = "read-frog-subtitles-ui-host"
@@ -83,4 +84,3 @@ export const SUBTITLE_FONT_FAMILIES = {
 // Subtitles source
 export const SUBTITLES_SOURCE = { NATIVE: "native", AI: "ai" } as const
 export type SubtitlesSource = (typeof SUBTITLES_SOURCE)[keyof typeof SUBTITLES_SOURCE]
-export const VIDEO_TRANSCRIPTION_APPLY_URL = "https://tally.so/r/7Rzb96"

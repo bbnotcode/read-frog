@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react"
 import type { Theme } from "@/types/config/theme"
 import type { ProviderSelectorOption } from "@/utils/providers/provider-display"
+import { UltraBadge } from "@/components/llm-providers/ultra-badge"
 import ProviderIcon from "@/components/provider-icon"
 import {
   Select,
@@ -16,6 +17,7 @@ import { i18n } from "@/utils/i18n"
 import {
   getProviderLogo,
   getProviderName,
+  isProviderSelectorOptionDisabled,
   isProviderSelectorItem,
 } from "@/utils/providers/provider-display"
 import { useTheme } from "../providers/theme-provider"
@@ -55,13 +57,38 @@ export function getProviderSelectorGroups(
     (provider) => !isProviderSelectorItem(provider) && isPureTranslateProviderConfig(provider),
   )
 
+  // Built-in models sit last: the user's own configured providers are the
+  // primary choice, the hosted fallback the closing offer.
   const groups: ProviderSelectorGroup[] = [
-    { labelKey: "translateService.builtInModels", providers: builtInProviders },
     { labelKey: "translateService.llmModels", providers: llmProviders },
     { labelKey: "translateService.normalTranslator", providers: pureTranslateProviders },
+    { labelKey: "translateService.builtInModels", providers: builtInProviders },
   ]
 
   return groups.filter((group) => group.providers.length > 0)
+}
+
+function ProviderOptionContent({
+  provider,
+  theme,
+  tooltipContainer,
+}: {
+  provider: ProviderSelectorOption
+  theme: Theme
+  tooltipContainer?: ComponentProps<typeof UltraBadge>["tooltipContainer"]
+}) {
+  const requiresUltra = isProviderSelectorItem(provider) && provider.requiresUltra === true
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+      <ProviderIcon
+        logo={getProviderLogo(provider, theme)}
+        name={getProviderName(provider)}
+        size="sm"
+      />
+      {requiresUltra && <UltraBadge tooltipContainer={tooltipContainer} />}
+    </div>
+  )
 }
 
 export default function ProviderSelector({
@@ -153,11 +180,15 @@ function GroupedSelect({
           <SelectGroup key={group.labelKey}>
             <SelectLabel>{i18n.t(group.labelKey)}</SelectLabel>
             {group.providers.map((provider) => (
-              <SelectItem key={provider.id} value={provider}>
-                <ProviderIcon
-                  logo={getProviderLogo(provider, theme)}
-                  name={getProviderName(provider)}
-                  size="sm"
+              <SelectItem
+                key={provider.id}
+                value={provider}
+                disabled={isProviderSelectorOptionDisabled(provider)}
+              >
+                <ProviderOptionContent
+                  provider={provider}
+                  theme={theme}
+                  tooltipContainer={selectContentProps?.container}
                 />
               </SelectItem>
             ))}
@@ -214,11 +245,15 @@ function UngroupedSelect({
       <SelectContent {...selectContentProps}>
         <SelectGroup>
           {providers.map((provider) => (
-            <SelectItem key={provider.id} value={provider}>
-              <ProviderIcon
-                logo={getProviderLogo(provider, theme)}
-                name={getProviderName(provider)}
-                size="sm"
+            <SelectItem
+              key={provider.id}
+              value={provider}
+              disabled={isProviderSelectorOptionDisabled(provider)}
+            >
+              <ProviderOptionContent
+                provider={provider}
+                theme={theme}
+                tooltipContainer={selectContentProps?.container}
               />
             </SelectItem>
           ))}

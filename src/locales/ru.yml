@@ -132,12 +132,29 @@ options:
     configTitle: Настройка провайдеров
     addProvider: Добавить провайдера
     builtInProvider: Встроенный провайдер
+    builtInAiUsage:
+      title: Квота встроенного ИИ
+      remaining: "Осталось $1%"
+      supportedFeatures: "Поддерживает функций: $1"
+      resetsAt: "Сброс: $1"
+      daily: Дневная квота
+      weekly: Недельная квота
+      features:
+        pageTranslation: Перевод страницы
+        customAction: Пользовательские AI-действия
+        noteSuggestion: Подсказки для заметок
+        selectionTranslation: Перевод выделения
+        videoSubtitles: Субтитры видео
+        inputTranslation: Перевод ввода
+        languageDetection: Определение языка
     sponsorCta: Получить быстрый и выгодный ИИ
+    sponsorCtaJalapenoCloud: Получить GLM 5.2 со скидкой 50 %
     setApiKeyWarning:
       message: Укажите API-ключ на странице $1
     badges:
       featureCount: $1 функций
       sponsor: Спонсор
+      sponsorJalapenoCloud: $$2 бесплатно
     dialog:
       title: Добавить нового провайдера
       groups:
@@ -166,6 +183,7 @@ options:
         confirm: Удалить
         cancel: Отмена
       atLeastOneLLMProvider: Требуется как минимум один LLM-провайдер перевода.
+      featureWouldLoseProvider: "Невозможно удалить: у функции «$1» не останется ни одного работающего провайдера."
       duplicateProviderName: 'Дублирующееся имя провайдера "$1"'
       defaultProvider:
         translate: Установить как провайдер перевода по умолчанию
@@ -211,10 +229,12 @@ options:
     providers:
       name:
         builtInAi: Встроенный ИИ
+        builtInAiAdvance: Продвинутый встроенный ИИ
         customChatComplete: Пользовательский Chat Complete
         customResponses: Пользовательский Responses
       attribution:
-        builtInAi: Предоставлено Atlas Cloud. Сейчас доступно только для пользовательских AI-действий. Чтобы открыть неограниченный опыт, купите выгодные кредиты на официальном сайте.
+        builtInAi: Стандартная модель, размещённая Read Frog. Пользователи без Ultra могут использовать её только в пользовательских AI-действиях; пользователям Ultra доступно больше функций.
+        builtInAiAdvance: Продвинутая модель, размещённая Read Frog, — только для подписчиков Ultra. Работает во всех функциях встроенного ИИ — переводе страниц, пользовательских AI-действиях и других — с общей недельной квотой. Расходует квоту быстрее, чем стандартная модель.
       description:
         openai: Предоставляет модели, такие как GPT-4o
         azure: Модели OpenAI в Azure через ваши развертывания
@@ -225,6 +245,7 @@ options:
         anthropic: Модели Claude, известные своей безопасностью и превосходными рассуждениями
         xai: ИИ-компания Илона Маска, предлагающая модели Grok с доступом к данным в реальном времени
         atlascloud: Единая OpenAI-совместимая платформа для новых моделей DeepSeek, Kimi, Qwen, Doubao, GLM и других
+        jalapenocloud: ИИ корпоративного уровня, которому доверяют ведущие разработчики LLM — теперь и для вас
         siliconflow: Высокопроизводительная платформа вывода для китайских и международных моделей
         tensdaq: Революционная MaaS-платформа с рыночным ценообразованием, устраняющая высокие фиксированные цены
         openaiCompatible: Подключение к пользовательской конечной точке, совместимой с OpenAI Chat Completions API
@@ -249,6 +270,7 @@ options:
         huggingface: API вывода Hugging Face с доступом к тысячам моделей с открытым кодом
     apiKey:
       showAPIKey: Показать API-ключ
+      getAPIKey: Получить API-ключ
     howToConfigure: Как настроить?
     testConnection:
       button: Проверить соединение
@@ -260,18 +282,20 @@ options:
       title: Провайдеры функций
       description: Выберите провайдера для каждой функции
       features:
-        translate: Перевод страницы
-        selectionToolbar_translate: Перевод выделения
+        pageTranslation: Перевод страницы
+        selectionTranslation: Перевод выделения
         inputTranslation: Перевод ввода
         videoSubtitles: Субтитры видео
+        noteSuggestion: Подсказки для заметок
       descriptions:
-        translate: Переводит страницу целиком — в двуязычном режиме или с заменой оригинала.
-        selectionToolbar_translate: Переводит выделенный текст через панель выделения.
+        pageTranslation: Переводит страницу целиком — в двуязычном режиме или с заменой оригинала.
+        selectionTranslation: Переводит выделенный текст через панель выделения.
         inputTranslation: Переводит то, что вы набрали в поле ввода, перед отправкой.
         videoSubtitles: Переводит субтитры, которые появляются в видеоплеере.
+        noteSuggestion: Предлагает слова, которые стоит сохранить в Notebase, после перевода выделенного текста.
     languageDetection:
       title: Определение языка
-      description: Влияет на точность определения языка для автоперевода, пропуска языков и выбора голоса озвучивания.
+      description: Влияет на точность определения языка для автоперевода и выбора голоса озвучивания.
       mode:
         basic: Базовый
         llm: LLM
@@ -533,11 +557,13 @@ options:
       speak:
         title: Озвучивание
         description: Показывать кнопку озвучивания, которая читает выделенный текст вслух
-      saveSuggestion:
-        title: Предложения по сохранению
+      noteSuggestion:
+        title: Подсказки для заметок
         description: После перевода выделенного текста с помощью ИИ-провайдера предлагать слова для сохранения в Notebase
         action: Действие
         actionDescription: Действие, которое формирует предложение
+        provider: Провайдер
+        providerDescription: ИИ-провайдер, который формирует предложение
     display:
       title: Отображение
       opacity:
@@ -927,13 +953,18 @@ options:
         description: ИИ заново режет субтитры на строки, читающиеся как предложения. Тайминг он задаёт сам, поэтому строки могут расходиться с речью. Нужен LLM-провайдер перевода.
     aiQuota:
       title: Лимит ИИ-субтитров
-      description: Использование вашего месячного лимита транскрипции ИИ-субтитров
+      description: ИИ распознаёт речь и создаёт точные субтитры для любого видео
+      launchBonusPromo: Оформите подписку до $1 и получите дополнительно 300 минут расшифровки
       loginRequired: Войдите, чтобы посмотреть лимит ИИ-субтитров
-      logIn: Войти
-      betaRequired: ИИ-субтитры находятся в бете и пока недоступны для вашего аккаунта
-      betaApply: Подать заявку на доступ
+      upgradeRequired: Для ИИ-субтитров нужна подписка Pro или Ultra
+      pools:
+        subscription: Месячная квота
+        launchBonus: Подарок к запуску
+      resetsOn: Сброс $1
+      expiresOn: Истекает $1
       loadError: Не удалось загрузить лимит. Повторите попытку позже.
-      summary: Использовано $1 из $2 минут, осталось $3
+      remainingOf: Осталось $1 / $2 мин
+      used: Использовано $1 мин
     style:
       title: Стиль субтитров
       description: Режим отображения, положение, шрифты, цвета и фон — всё настраивается по живому предпросмотру
@@ -1077,6 +1108,7 @@ action:
   saveToNotebasePendingLoginDescription: После входа Read Frog автоматически создаст Notebase и сохранит этот результат.
   saveToNotebasePendingConnectedLoginDescription: После входа Read Frog сохранит в подключённую Notebase, если это возможно. Если аккаунт не может её использовать, будет создана новая Notebase.
   upgrade: Повысить тариф
+  updatePayment: Обновить оплату
   openCustomActions: Открыть Custom AI Actions
   openNotebase: Открыть Notebase
   contextDetailsTitleLabel: Заголовок
@@ -1084,13 +1116,13 @@ action:
   translation: Перевод
   speak: Озвучить
   playing: Воспроизведение
-saveSuggestion:
+noteSuggestion:
   title: Стоит сохранить
-  description: Сохраните эти слова в Notebase, чтобы повторять их в любое время.
+  description: Выберите слова для сохранения в Notebase и повторяйте их в любое время.
   save: Сохранить
   saved: Сохранено
   staleSuggestion: Это предложение устарело
-  toggleLabel: Показывать предложения по сохранению
+  toggleLabel: Показывать подсказки для заметок
 thinking:
   label: Размышление
   complete: Размышление завершено
@@ -1100,7 +1132,7 @@ shortcutKeySelector:
   placeholder: Пожалуйста, введите горячую клавишу
 subtitles:
   loadingAiSubtitles: Загрузка ИИ-субтитров… (ожидается 3 мин)
-  requestAiSubtitles: Запросить ИИ-субтитры (Beta)
+  requestAiSubtitles: Запросить ИИ-субтитры
   usingAiSubtitles: Используются ИИ-субтитры
   toggle:
     enabled: Перевод субтитров включён
@@ -1132,16 +1164,31 @@ subtitles:
     aiAuthFailed: Ошибка аутентификации API, проверьте ваш API ключ
     aiServiceUnavailable: Служба перевода временно недоступна
     aiQuotaExceeded: Месячный лимит ИИ-субтитров исчерпан
+    aiQuotaExceededWithReset: Месячный лимит ИИ-субтитров исчерпан · сброс $1
+    aiLoginRequired: Войдите, чтобы посмотреть лимит ИИ-субтитров
+    aiSubscriptionRequired: Для ИИ-субтитров нужна подписка Pro или Ultra
+    aiPaymentRequired: Обновите способ оплаты, чтобы продолжить создание ИИ-субтитров
+    aiVideoTooLong: Это видео слишком длинное для ИИ-субтитров
+    aiStillProcessing: Транскрипция ещё идёт — нажмите ещё раз через несколько минут
     aiRequestFailed: Не удалось запросить ИИ-субтитры, повторите попытку позже
     aiNoResponse: Служба AI не ответила, отображается оригинальный текст
     translatedExportFailed: Не удалось создать переведённые субтитры
     translatedExportIncomplete: Не удалось перевести все строки субтитров
     translatedExportSameLanguage: Исходный и целевой языки совпадают
 hostedAi:
+  ultraBadge:
+    tooltip: Требуется план Ultra · Нажмите на значок, чтобы получить его
+  availability:
+    authenticationRequired: Войдите, чтобы использовать этого провайдера
+    ultraRequired: Требуется план Ultra
+    quotaExhausted: Квота исчерпана
+    serviceUnavailable: Временно недоступно
+    usedPercent: "Использовано квоты: $1%"
+    resetsAt: "Сброс в $1"
   errors:
     rateLimited: Слишком много запросов, пожалуйста, повторите позже.
-    guestRateLimited: Лимит гостя достигнут. Войдите, чтобы получить больше бесплатных AI-запросов.
-    userRateLimited: Слишком много запросов. Вы превысили бесплатный лимит, пожалуйста, повторите позже.
+    guestRateLimited: Слишком много гостевых запросов. Повторите позже.
+    userRateLimited: Слишком много запросов. Повторите позже.
 hotkey:
   control: Ctrl
   alt: Option

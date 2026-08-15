@@ -2,17 +2,21 @@ import type { ProviderConfig } from "@/types/config/provider"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { DEFAULT_CONFIG } from "@/utils/constants/config"
 import { NO_TRANSLATION_SENTINEL } from "@/utils/constants/prompt"
+import { isTranslationCancelledError } from "@/utils/request/cancellation"
 
 const onMessageMock = vi.fn<(...args: any[]) => any>()
 const ensureInitializedConfigMock = vi.fn<(...args: any[]) => any>()
 const executeTranslateMock = vi.fn<(...args: any[]) => any>()
 const generateArticleSummaryMock = vi.fn<(...args: any[]) => any>()
+const generateTextForProviderRefMock = vi.fn<(...args: any[]) => any>()
 const putBatchRequestRecordMock = vi.fn<(...args: any[]) => any>()
 const articleSummaryCacheGetMock = vi.fn<(...args: any[]) => any>()
 const articleSummaryCachePutMock = vi.fn<(...args: any[]) => any>()
 const translationCacheGetMock = vi.fn<(...args: any[]) => any>()
 const translationCachePutMock = vi.fn<(...args: any[]) => any>()
 const translationCacheDeleteMock = vi.fn<(...args: any[]) => any>()
+const runStreamTextInBackgroundMock = vi.fn<(...args: any[]) => any>()
+const getTranslatePromptMock = vi.fn<(...args: any[]) => any>()
 
 vi.mock("@/utils/message", () => ({
   onMessage: onMessageMock,
@@ -48,6 +52,18 @@ vi.mock("@/utils/db/dexie/db", () => ({
   },
 }))
 
+vi.mock("../background-stream", () => ({
+  runStreamTextInBackground: runStreamTextInBackgroundMock,
+  generateTextForProviderRef: generateTextForProviderRefMock,
+}))
+
+// Partial: the subtitles prompt builder pulls resolvePromptReplacementValue
+// from this module, and the hosted path runs the real builder.
+vi.mock("@/utils/prompts/translate", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/prompts/translate")>()),
+  getTranslatePrompt: getTranslatePromptMock,
+}))
+
 function getRegisteredMessageHandler(name: string) {
   const registration = onMessageMock.mock.calls.find((call) => call[0] === name)
   if (!registration) {
@@ -62,6 +78,10 @@ function getRegisteredMessageHandler(name: string) {
     data: Record<string, unknown>
     sender?: { tab?: { id?: number } }
   }): Promise<unknown> => await handler(message)
+}
+
+function localProviderRef(config: ProviderConfig) {
+  return { kind: "local" as const, config }
 }
 
 const llmProvider: ProviderConfig = {
@@ -80,11 +100,12 @@ const googleProvider: ProviderConfig = {
   enabled: true,
 }
 
-const microsoftProvider: ProviderConfig = {
-  id: "microsoft-translate-default",
-  name: "Microsoft Translate",
-  provider: "microsoft-translate",
+const deepLProvider: ProviderConfig = {
+  id: "deepl-default",
+  name: "DeepL",
+  provider: "deepl",
   enabled: true,
+  apiKey: "test-key",
 }
 
 describe("translation queue helpers", () => {
@@ -94,8 +115,8 @@ describe("translation queue helpers", () => {
 
     ensureInitializedConfigMock.mockResolvedValue({
       ...DEFAULT_CONFIG,
-      translate: {
-        ...DEFAULT_CONFIG.translate,
+      pageTranslation: {
+        ...DEFAULT_CONFIG.pageTranslation,
         enableAIContentAware: true,
       },
       videoSubtitles: {
@@ -120,6 +141,14 @@ describe("translation queue helpers", () => {
     translationCacheGetMock.mockResolvedValue(undefined)
     translationCachePutMock.mockResolvedValue(undefined)
     translationCacheDeleteMock.mockResolvedValue(undefined)
+    runStreamTextInBackgroundMock.mockResolvedValue({
+      output: "hosted translation",
+      thinking: { status: "complete", text: "" },
+    })
+    getTranslatePromptMock.mockResolvedValue({
+      systemPrompt: "Translate accurately",
+      prompt: "Source text",
+    })
   })
 
   it("routes only llm providers through the batch queue", async () => {
@@ -144,13 +173,125 @@ describe("translation queue helpers", () => {
     expect(shouldUseBatchQueue(deeplProvider)).toBe(false)
     expect(shouldUseBatchQueue(deeplxProvider)).toBe(false)
     expect(shouldUseBatchQueue(llmProvider)).toBe(true)
+    expect(
+      shouldUseBatchQueue({
+        kind: "system",
+        providerId: "read-frog-free-ai",
+        modelTier: "normal",
+        modelRevision: "normal-r1",
+      }),
+    ).toBe(true)
   }, 15_000)
+
+  it("reuses the hosted requestId when RequestQueue retries the same model call", async () => {
+    runStreamTextInBackgroundMock
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({
+        output: "hosted translation",
+        thinking: { status: "complete", text: "" },
+      })
+
+    const { setUpWebPageTranslationQueue } = await import("../translation-queues")
+    setUpWebPageTranslationQueue()
+    const handler = getRegisteredMessageHandler("enqueueTranslateRequest")
+
+    await expect(
+      handler({
+        data: {
+          text: "hello",
+          langConfig: DEFAULT_CONFIG.language,
+          providerRef: {
+            kind: "system",
+            providerId: "read-frog-free-ai",
+            modelTier: "normal",
+            modelRevision: "normal-r1",
+          },
+          scheduleAt: Date.now(),
+          hash: "hosted-retry-hash",
+        },
+      }),
+    ).resolves.toBe("hosted translation")
+
+    expect(runStreamTextInBackgroundMock).toHaveBeenCalledTimes(2)
+    const firstPayload = runStreamTextInBackgroundMock.mock.calls[0]![0]
+    const secondPayload = runStreamTextInBackgroundMock.mock.calls[1]![0]
+    expect(firstPayload).toMatchObject({
+      providerId: "read-frog-free-ai",
+      modelTier: "normal",
+      instructions: "Translate accurately",
+      prompt: "Source text",
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/i),
+    })
+    expect(secondPayload.requestId).toBe(firstPayload.requestId)
+    expect(putBatchRequestRecordMock).not.toHaveBeenCalled()
+  }, 5_000)
+
+  it("routes hosted tasks through the shared user-configured request queue", async () => {
+    ensureInitializedConfigMock.mockResolvedValue({
+      ...DEFAULT_CONFIG,
+      pageTranslation: {
+        ...DEFAULT_CONFIG.pageTranslation,
+        requestQueueConfig: { rate: 0.1, capacity: 1 },
+        batchQueueConfig: { maxCharactersPerBatch: 1000, maxItemsPerBatch: 1 },
+      },
+    })
+    const abortSignals: (AbortSignal | undefined)[] = []
+    runStreamTextInBackgroundMock.mockImplementation(
+      (_payload: unknown, options?: { signal?: AbortSignal }) => {
+        abortSignals.push(options?.signal)
+        return new Promise(() => {})
+      },
+    )
+
+    const { setUpWebPageTranslationQueue } = await import("../translation-queues")
+    setUpWebPageTranslationQueue()
+    const enqueue = getRegisteredMessageHandler("enqueueTranslateRequest")
+    const cancel = getRegisteredMessageHandler("cancelPageTranslationRequests")
+
+    const sender = { tab: { id: 7 } }
+    const requests = ["shared-queue-one", "shared-queue-two"].map((hash) =>
+      enqueue({
+        data: {
+          text: `text for ${hash}`,
+          langConfig: DEFAULT_CONFIG.language,
+          providerRef: {
+            kind: "system",
+            providerId: "read-frog-free-ai",
+            modelTier: "normal",
+            modelRevision: "normal-r1",
+          },
+          scheduleAt: Date.now(),
+          hash,
+          sessionId: "session-a",
+        },
+        sender,
+      }),
+    )
+    for (const request of requests) request.catch(() => {})
+
+    // capacity 1 admits exactly one in-flight hosted call; the second waits
+    // ~10s (rate 0.1) for the next token. The former dedicated hosted queue
+    // (rate 2 / capacity 2) would have started both immediately.
+    await vi.waitFor(() => expect(runStreamTextInBackgroundMock).toHaveBeenCalledTimes(1))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(runStreamTextInBackgroundMock).toHaveBeenCalledTimes(1)
+
+    await cancel({ data: { sessionId: "session-a" }, sender })
+
+    const settled = await Promise.allSettled(requests)
+    expect(settled.map((result) => result.status)).toEqual(["rejected", "rejected"])
+    const cancelledReasons = settled.map(
+      (result) => result.status === "rejected" && isTranslationCancelledError(result.reason),
+    )
+    expect(cancelledReasons).toEqual([true, true])
+    expect(abortSignals[0]?.aborted).toBe(true)
+  }, 5_000)
 
   it("keeps request-local marker zero isolated across LLM batch items", async () => {
     ensureInitializedConfigMock.mockResolvedValue({
       ...DEFAULT_CONFIG,
-      translate: {
-        ...DEFAULT_CONFIG.translate,
+      pageTranslation: {
+        ...DEFAULT_CONFIG.pageTranslation,
         providerId: llmProvider.id,
         batchQueueConfig: {
           maxCharactersPerBatch: 1000,
@@ -171,7 +312,7 @@ describe("translation queue helpers", () => {
         data: {
           text: `<span data-rf-attr="0">Hello</span>`,
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: localProviderRef(llmProvider),
           scheduleAt: Date.now(),
           hash: "marker-batch-one",
           textFormat: "html",
@@ -181,7 +322,7 @@ describe("translation queue helpers", () => {
         data: {
           text: `<a data-rf-attr="0">Read</a>`,
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: localProviderRef(llmProvider),
           scheduleAt: Date.now(),
           hash: "marker-batch-two",
           textFormat: "html",
@@ -215,7 +356,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: localProviderRef(llmProvider),
           scheduleAt: Date.now(),
           hash: "same-request-hash",
         },
@@ -244,7 +385,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: localProviderRef(llmProvider),
           scheduleAt: Date.now(),
           hash: "llm-cache-hit",
         },
@@ -264,7 +405,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
         scheduleAt: Date.now(),
         hash: "subtitle-hash",
         webTitle: "Video title",
@@ -294,8 +435,8 @@ describe("translation queue helpers", () => {
   it("keeps subtitle translations with different video context in separate batches", async () => {
     ensureInitializedConfigMock.mockResolvedValue({
       ...DEFAULT_CONFIG,
-      translate: {
-        ...DEFAULT_CONFIG.translate,
+      pageTranslation: {
+        ...DEFAULT_CONFIG.pageTranslation,
         enableAIContentAware: true,
       },
       videoSubtitles: {
@@ -321,7 +462,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: { kind: "local" as const, config: llmProvider },
           scheduleAt: Date.now(),
           hash: "subtitle-hash-one",
           webTitle: "First video",
@@ -332,7 +473,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: llmProvider,
+          providerRef: { kind: "local" as const, config: llmProvider },
           scheduleAt: Date.now(),
           hash: "subtitle-hash-two",
           webTitle: "Second video",
@@ -385,7 +526,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: llmProvider,
+        providerRef: localProviderRef(llmProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         webTitle: "Page title",
@@ -431,7 +572,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
       },
@@ -458,7 +599,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: googleProvider,
+          providerRef: localProviderRef(googleProvider),
           scheduleAt: Date.now(),
           hash: "webpage-hash",
           forceRetranslation: true,
@@ -492,7 +633,7 @@ describe("translation queue helpers", () => {
         data: {
           text: "hello",
           langConfig: DEFAULT_CONFIG.language,
-          providerConfig: googleProvider,
+          providerRef: localProviderRef(googleProvider),
           scheduleAt: Date.now(),
           hash: "webpage-hash",
           forceRetranslation: true,
@@ -516,7 +657,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
       },
@@ -545,7 +686,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="0">Hello</span><a data-rf-attr="1">Read</a>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         textFormat: "html",
@@ -572,7 +713,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="0">Hello</span>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         textFormat: "html",
@@ -607,7 +748,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="rf-page-0">Hello</span>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "legacy-marker-hash",
         textFormat: "html",
@@ -635,7 +776,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="0">Hello</span>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         textFormat: "html",
@@ -660,7 +801,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="0">Hello</span>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "empty-html-result",
         textFormat: "html",
@@ -683,7 +824,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `<span data-rf-attr="0">Hello</span><a data-rf-attr="0">Read</a>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         textFormat: "html",
@@ -711,7 +852,7 @@ describe("translation queue helpers", () => {
       data: {
         text: `Explain <span data-rf-attr="0">this example</span>`,
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "plain-marker-shaped-text",
         textFormat: "plain",
@@ -738,7 +879,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "already in target language",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "sentinel-hash",
       },
@@ -764,7 +905,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "<b>hello</b>",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: localProviderRef(googleProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
         textFormat: "html",
@@ -794,7 +935,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: { kind: "local" as const, config: googleProvider },
         scheduleAt: Date.now(),
         hash: "subtitle-hash",
       },
@@ -816,7 +957,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: googleProvider,
+        providerRef: { kind: "local" as const, config: googleProvider },
         scheduleAt: Date.now(),
         hash: "subtitle-hash",
       },
@@ -845,7 +986,7 @@ describe("translation queue helpers", () => {
       data: {
         text: "hello",
         langConfig: DEFAULT_CONFIG.language,
-        providerConfig: microsoftProvider,
+        providerRef: localProviderRef(deepLProvider),
         scheduleAt: Date.now(),
         hash: "webpage-hash",
       },
@@ -854,6 +995,166 @@ describe("translation queue helpers", () => {
     expect(result).toBe("A&amp;B")
     expect(executeTranslateMock).not.toHaveBeenCalled()
     expect(translationCachePutMock).not.toHaveBeenCalled()
+  })
+
+  it("bills hosted subtitle translations against videoSubtitles, not page translation", async () => {
+    // The queue's route was briefly declared but never threaded through, which
+    // would have billed every subtitle line to the page-translation quota.
+    runStreamTextInBackgroundMock.mockResolvedValue({ output: "译文" })
+    const { setUpSubtitlesTranslationQueue } = await import("../translation-queues")
+    setUpSubtitlesTranslationQueue()
+
+    const handler = getRegisteredMessageHandler("enqueueSubtitlesTranslateRequest")
+    await handler({
+      data: {
+        text: "hello",
+        langConfig: DEFAULT_CONFIG.language,
+        providerRef: {
+          kind: "system" as const,
+          providerId: "read-frog-advance-ai",
+          modelTier: "advance",
+          modelRevision: "advance-r1",
+        },
+        scheduleAt: Date.now(),
+        hash: "subtitle-hosted-hash",
+      },
+    })
+
+    expect(runStreamTextInBackgroundMock).toHaveBeenCalledWith(
+      expect.objectContaining({ hostedFeature: "videoSubtitles" }),
+      expect.anything(),
+    )
+  })
+
+  it("bills a hosted request against the route it carries, not the queue default", async () => {
+    // Input translation shares the webpage queue; without the per-request
+    // route it would bill the page-translation quota it never gated on.
+    const { setUpWebPageTranslationQueue } = await import("../translation-queues")
+    setUpWebPageTranslationQueue()
+
+    const handler = getRegisteredMessageHandler("enqueueTranslateRequest")
+    await handler({
+      data: {
+        text: "hello",
+        langConfig: DEFAULT_CONFIG.language,
+        providerRef: {
+          kind: "system" as const,
+          providerId: "read-frog-free-ai",
+          modelTier: "normal",
+          modelRevision: "normal-r1",
+        },
+        scheduleAt: Date.now(),
+        hash: "hosted-input-route-hash",
+        hostedFeature: "inputTranslation",
+      },
+    })
+
+    expect(runStreamTextInBackgroundMock).toHaveBeenCalledWith(
+      expect.objectContaining({ hostedFeature: "inputTranslation" }),
+      expect.anything(),
+    )
+  })
+
+  it("keeps requests for different hosted routes in separate billing batches", async () => {
+    ensureInitializedConfigMock.mockResolvedValue({
+      ...DEFAULT_CONFIG,
+      pageTranslation: {
+        ...DEFAULT_CONFIG.pageTranslation,
+        batchQueueConfig: { maxCharactersPerBatch: 1000, maxItemsPerBatch: 4 },
+      },
+    })
+    const { setUpWebPageTranslationQueue } = await import("../translation-queues")
+    setUpWebPageTranslationQueue()
+
+    const handler = getRegisteredMessageHandler("enqueueTranslateRequest")
+    const base = {
+      langConfig: DEFAULT_CONFIG.language,
+      providerRef: {
+        kind: "system" as const,
+        providerId: "read-frog-free-ai",
+        modelTier: "normal",
+        modelRevision: "normal-r1",
+      },
+      scheduleAt: Date.now(),
+    }
+    await Promise.all([
+      handler({ data: { ...base, text: "page paragraph", hash: "route-batch-page-hash" } }),
+      handler({
+        data: {
+          ...base,
+          text: "typed input",
+          hash: "route-batch-input-hash",
+          hostedFeature: "inputTranslation",
+        },
+      }),
+    ])
+
+    // A batch bills as one unit, so the route is part of the batch key: one
+    // merged batch here would bill the input request to the page quota.
+    expect(runStreamTextInBackgroundMock).toHaveBeenCalledTimes(2)
+    const billedFeatures = runStreamTextInBackgroundMock.mock.calls
+      .map((call) => (call[0] as { hostedFeature?: string }).hostedFeature)
+      .sort((a, b) => (a ?? "").localeCompare(b ?? ""))
+    expect(billedFeatures).toEqual(["inputTranslation", "pageTranslation"])
+  })
+
+  it("bills the webpage summary against the sender's route and stamps an idempotency key", async () => {
+    generateTextForProviderRefMock.mockResolvedValue("hosted summary")
+    generateArticleSummaryMock.mockImplementation(
+      async (
+        _title: string,
+        _text: string,
+        providerRef: unknown,
+        options: {
+          hostedFeature: string
+          generate: (payload: unknown, runOptions: unknown) => Promise<string>
+        },
+      ) =>
+        options.generate(
+          {
+            providerRef,
+            hostedFeature: options.hostedFeature,
+            instructions: "sys",
+            prompt: "user",
+          },
+          { signal: undefined },
+        ),
+    )
+    const hostedRef = {
+      kind: "system" as const,
+      providerId: "read-frog-advance-ai",
+      modelTier: "advance",
+      modelRevision: "advance-r1",
+    }
+    const { setUpWebPageTranslationQueue } = await import("../translation-queues")
+    setUpWebPageTranslationQueue()
+
+    const handler = getRegisteredMessageHandler("getOrGenerateWebPageSummary")
+    const result = await handler({
+      data: {
+        webTitle: "Page title",
+        webContent: "page body",
+        providerRef: hostedRef,
+        hostedFeature: "inputTranslation",
+      },
+    })
+
+    expect(result).toBe("hosted summary")
+    // The summary is a sub-call of the triggering feature: gate (content side)
+    // and billing (here) must name the same route.
+    expect(generateArticleSummaryMock).toHaveBeenCalledWith(
+      "Page title",
+      "page body",
+      hostedRef,
+      expect.objectContaining({ hostedFeature: "inputTranslation" }),
+    )
+    expect(generateTextForProviderRefMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostedFeature: "inputTranslation",
+        requestId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i),
+      }),
+      expect.anything(),
+    )
   })
 
   it("exposes webpage summary generation as a separate background handler", async () => {
@@ -865,7 +1166,7 @@ describe("translation queue helpers", () => {
       data: {
         webTitle: "Page title",
         webContent: "page body",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
 
@@ -873,10 +1174,11 @@ describe("translation queue helpers", () => {
     expect(generateArticleSummaryMock).toHaveBeenCalledWith(
       "Page title",
       "page body",
-      llmProvider,
-      {
+      { kind: "local", config: llmProvider },
+      expect.objectContaining({
+        hostedFeature: "pageTranslation",
         signal: expect.any(AbortSignal),
-      },
+      }),
     )
   })
 
@@ -889,7 +1191,7 @@ describe("translation queue helpers", () => {
       data: {
         videoTitle: "Video title",
         subtitlesContext: "subtitle transcript",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
 
@@ -897,9 +1199,33 @@ describe("translation queue helpers", () => {
     expect(generateArticleSummaryMock).toHaveBeenCalledWith(
       "Video title",
       "subtitle transcript",
-      llmProvider,
-      { signal: expect.any(AbortSignal) },
+      { kind: "local", config: llmProvider },
+      expect.objectContaining({
+        hostedFeature: "videoSubtitles",
+        signal: expect.any(AbortSignal),
+      }),
     )
+  })
+
+  it("refuses a summary for a provider with no model to prompt", async () => {
+    const { setUpSubtitlesTranslationQueue } = await import("../translation-queues")
+    setUpSubtitlesTranslationQueue()
+
+    const handler = getRegisteredMessageHandler("getSubtitlesSummary")
+    // Google is a legal videoSubtitles provider — the capability admits any
+    // translate provider — but it cannot be prompted. Admitting this to the
+    // queue means a task that throws and burns its retries at the start of
+    // every video.
+    const result = await handler({
+      data: {
+        videoTitle: "Video title",
+        subtitlesContext: "subtitle transcript",
+        providerRef: { kind: "local" as const, config: googleProvider },
+      },
+    })
+
+    expect(result).toBeNull()
+    expect(generateArticleSummaryMock).not.toHaveBeenCalled()
   })
 
   it("returns null for invalid subtitle summary requests", async () => {
@@ -911,7 +1237,7 @@ describe("translation queue helpers", () => {
       data: {
         videoTitle: "",
         subtitlesContext: "subtitle transcript",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
 
@@ -930,7 +1256,7 @@ describe("translation queue helpers", () => {
       data: {
         videoTitle: "Video title",
         subtitlesContext: "subtitle transcript",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
 
@@ -954,14 +1280,14 @@ describe("translation queue helpers", () => {
       data: {
         videoTitle: "Video title",
         subtitlesContext: "subtitle transcript",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
     const secondRequest = handler({
       data: {
         videoTitle: "Video title",
         subtitlesContext: "subtitle transcript",
-        providerConfig: llmProvider,
+        providerRef: { kind: "local" as const, config: llmProvider },
       },
     })
 

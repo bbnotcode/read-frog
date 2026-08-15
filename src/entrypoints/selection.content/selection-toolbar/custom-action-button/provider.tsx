@@ -1,8 +1,9 @@
-import type { ReactNode } from "react"
+import type { ComponentProps, ReactNode } from "react"
 import type { SelectionSession } from "../atoms"
 import type { SelectionPopoverActions } from "@/components/ui/selection-popover"
 import { useAtomValue, useSetAtom } from "jotai"
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useHostedAiProviderOptions } from "@/components/llm-providers/use-hosted-ai-provider-options"
 import { toastManager } from "@/components/ui/base-ui/toast"
 import { SelectionPopover } from "@/components/ui/selection-popover"
 import { ANALYTICS_FEATURE, ANALYTICS_SURFACE } from "@/types/analytics"
@@ -57,6 +58,20 @@ interface SelectionCustomActionContextValue {
 
 const SelectionCustomActionContext = createContext<SelectionCustomActionContextValue | null>(null)
 
+/**
+ * Keeps the hosted-status hook inside SelectionPopover.Content, which stays
+ * unmounted until the popover first opens — the selection app mounts on every
+ * page, and merely loading a page must not fire hosted-AI session/status
+ * requests.
+ */
+function CustomActionFooterContent({
+  providers,
+  ...props
+}: ComponentProps<typeof SelectionToolbarFooterContent>) {
+  const customActionProviders = useHostedAiProviderOptions("customAction", providers)
+  return <SelectionToolbarFooterContent providers={customActionProviders} {...props} />
+}
+
 function useSelectionCustomActionContext() {
   const context = use(SelectionCustomActionContext)
   if (!context) {
@@ -93,11 +108,7 @@ function ExternalCustomActionExecutor({
       language,
       action: action?.enabled === false ? null : (action ?? null),
       provider: action
-        ? resolveProviderRefForCapability(
-            "selectionToolbar.customAction",
-            providersConfig,
-            action.providerId,
-          )
+        ? resolveProviderRefForCapability("customAction", providersConfig, action.providerId)
         : null,
     }),
     [action, language, providersConfig],
@@ -206,17 +217,13 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
       language,
       action: activeAction,
       provider: activeAction
-        ? resolveProviderRefForCapability(
-            "selectionToolbar.customAction",
-            providersConfig,
-            activeAction.providerId,
-          )
+        ? resolveProviderRefForCapability("customAction", providersConfig, activeAction.providerId)
         : null,
     }),
     [activeAction, language, providersConfig],
   )
-  const customActionProviders = useMemo(
-    () => getSelectableProvidersForCapability("selectionToolbar.customAction", providersConfig),
+  const baseCustomActionProviders = useMemo(
+    () => getSelectableProvidersForCapability("customAction", providersConfig),
     [providersConfig],
   )
   const executionPlan = useMemo(
@@ -367,11 +374,7 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
             },
           ),
           ...classifyResolvedProvider(
-            resolveProviderRefForCapability(
-              "selectionToolbar.customAction",
-              providersConfig,
-              action.providerId,
-            ),
+            resolveProviderRefForCapability("customAction", providersConfig, action.providerId),
           ),
           outcome: "failure",
         })
@@ -516,9 +519,9 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
             />
             <SelectionToolbarErrorAlert error={displayedError} />
           </SelectionPopover.Body>
-          <SelectionToolbarFooterContent
+          <CustomActionFooterContent
             paragraphsText={paragraphsText}
-            providers={customActionProviders}
+            providers={baseCustomActionProviders}
             titleText={titleText}
             value={customActionRequest.provider?.id ?? ""}
             onProviderChange={handleProviderChange}
@@ -534,7 +537,7 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
                 <CustomActionToolButton action={activeAction} />
               </>
             )}
-          </SelectionToolbarFooterContent>
+          </CustomActionFooterContent>
         </SelectionPopover.Content>
       </SelectionPopover.Root>
       {externalRequest && (

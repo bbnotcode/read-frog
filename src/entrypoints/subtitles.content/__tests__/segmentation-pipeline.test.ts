@@ -2,17 +2,11 @@ import { describe, expect, it, vi } from "vitest"
 import { PROCESS_LOOK_AHEAD_MS } from "@/utils/constants/subtitles"
 import { SegmentationPipeline } from "../segmentation-pipeline"
 
-vi.mock("@/utils/config/storage", () => ({
-  getLocalConfig: vi.fn<(...args: any[]) => any>().mockResolvedValue({
-    videoSubtitles: {
-      aiSegmentation: true,
-    },
-  }),
-}))
-
 vi.mock("@/utils/subtitles/processor/ai-segmentation", () => ({
   aiSegmentBlock: vi.fn<(...args: any[]) => any>().mockRejectedValue(new Error("ai failed")),
 }))
+
+const LOCAL_REF = { kind: "local" as const, config: { id: "openai-default" } as never }
 
 describe("segmentation pipeline", () => {
   it("replaces overlapping baseline fragments when AI fallback is used", async () => {
@@ -26,6 +20,7 @@ describe("segmentation pipeline", () => {
       rawFragments,
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
     })
 
     await (pipeline as any).processNextChunk(0)
@@ -46,6 +41,7 @@ describe("segmentation pipeline", () => {
       // Playback stays at the very beginning (e.g. paused right after enabling).
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
       preSegmented: true,
     })
 
@@ -61,6 +57,34 @@ describe("segmentation pipeline", () => {
     // reaches at most two windows ahead of the playhead — not the rest of the video.
     const furthestSegmented = Math.max(...segmentedStarts)
     expect(furthestSegmented).toBeLessThan(2 * PROCESS_LOOK_AHEAD_MS)
+    expect(pipeline.hasUnprocessedChunks()).toBe(true)
+  })
+
+  it("widens the segmentation look-ahead window with playback rate", async () => {
+    // 10 minutes of word-level fragments, one per second.
+    const rawFragments = Array.from({ length: 600 }, (_, i) => ({
+      text: `w${i}`,
+      start: i * 1000,
+      end: i * 1000 + 1000,
+    }))
+
+    const pipeline = new SegmentationPipeline({
+      rawFragments,
+      getVideoElement: () => ({ currentTime: 0, playbackRate: 3 }) as HTMLVideoElement,
+      getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
+      preSegmented: true,
+    })
+
+    await (pipeline as any).runLoop()
+
+    const segmentedStarts = (pipeline as any).segmentedRawStarts as Set<number>
+    const furthestSegmented = Math.max(...segmentedStarts)
+
+    // At 3x the window is 3x wider, so the buffer reaches past the 1x bound...
+    expect(furthestSegmented).toBeGreaterThan(2 * PROCESS_LOOK_AHEAD_MS)
+    // ...but still stays within two 3x-wide windows, not the rest of the video.
+    expect(furthestSegmented).toBeLessThan(2 * 3 * PROCESS_LOOK_AHEAD_MS)
     expect(pipeline.hasUnprocessedChunks()).toBe(true)
   })
 
@@ -81,6 +105,7 @@ describe("segmentation pipeline", () => {
           },
         }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
       preSegmented: true,
     })
 
@@ -109,6 +134,7 @@ describe("segmentation pipeline", () => {
       rawFragments,
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
       onChunkSegmented,
     })
 
@@ -120,26 +146,27 @@ describe("segmentation pipeline", () => {
     ])
   })
 
-  it("falls back to local optimize when config is missing instead of orphaning the chunk", async () => {
-    const { getLocalConfig } = await import("@/utils/config/storage")
-    vi.mocked(getLocalConfig).mockResolvedValueOnce(null)
-
+  it("falls back to local optimize without a provider ref instead of orphaning the chunk", async () => {
     const rawFragments = [
       { text: "hello", start: 0, end: 500 },
       { text: "world", start: 500, end: 1000 },
     ]
     const onChunkSegmented = vi.fn<(...args: any[]) => any>()
+    const { aiSegmentBlock } = await import("@/utils/subtitles/processor/ai-segmentation")
+    const aiCallsBefore = vi.mocked(aiSegmentBlock).mock.calls.length
 
     const pipeline = new SegmentationPipeline({
       baselineFragments: [{ text: "hello world", start: 0, end: 1000 }],
       rawFragments,
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: null,
       onChunkSegmented,
     })
 
     await (pipeline as any).processNextChunk(0)
 
+    expect(vi.mocked(aiSegmentBlock).mock.calls.length).toBe(aiCallsBefore)
     expect(onChunkSegmented).toHaveBeenCalled()
     // Starts must not remain "segmented" with no replacement applied.
     expect(pipeline.processedFragments.length).toBeGreaterThan(0)
@@ -157,6 +184,7 @@ describe("segmentation pipeline", () => {
       ],
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
     })
 
     ;(pipeline as any).replaceProcessedChunk(
@@ -192,6 +220,7 @@ describe("segmentation pipeline", () => {
       rawFragments,
       getVideoElement: () => ({ currentTime: 0 }) as HTMLVideoElement,
       getSourceLanguage: () => "en",
+      providerRef: LOCAL_REF,
       onChunkSegmented,
     })
 

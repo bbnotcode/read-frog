@@ -132,12 +132,29 @@ options:
     configTitle: Provider config
     addProvider: Add provider
     builtInProvider: Built-in provider
+    builtInAiUsage:
+      title: Built-in AI quota
+      remaining: "$1% left"
+      supportedFeatures: "Supports $1 features"
+      resetsAt: "Resets at $1"
+      daily: Daily quota
+      weekly: Weekly quota
+      features:
+        pageTranslation: Page translation
+        customAction: Custom AI Actions
+        noteSuggestion: Note suggestions
+        selectionTranslation: Selection translation
+        videoSubtitles: Video subtitles
+        inputTranslation: Input translation
+        languageDetection: Language detection
     sponsorCta: Get fast, cost-effective AI
+    sponsorCtaJalapenoCloud: Get 50% Off GLM 5.2
     setApiKeyWarning:
       message: Please set your API key on the $1 page
     badges:
       featureCount: $1 features
       sponsor: Sponsor
+      sponsorJalapenoCloud: $$2 Free
     dialog:
       title: Add new provider
       groups:
@@ -166,6 +183,7 @@ options:
         confirm: Delete
         cancel: Cancel
       atLeastOneLLMProvider: At least one LLM translation provider is required.
+      featureWouldLoseProvider: 'Cannot delete: "$1" would be left with no provider that can run it.'
       providerInUseCannotDisable: 'Cannot disable "$1" because it is currently used by $2 feature(s).'
       duplicateProviderName: 'Duplicate provider name "$1"'
       defaultProvider:
@@ -212,10 +230,12 @@ options:
     providers:
       name:
         builtInAi: Built-in AI
+        builtInAiAdvance: Advanced Built-in AI
         customChatComplete: Custom Chat Complete
         customResponses: Custom Responses
       attribution:
-        builtInAi: Provided by Atlas Cloud. Currently only available for Custom AI Actions. To unlock an unrestricted experience, purchase highly cost-effective credits on the official website.
+        builtInAi: Read Frog's hosted standard model. Non-Ultra users can use it only for Custom AI Actions; Ultra members can use it on more features.
+        builtInAiAdvance: Read Frog's hosted advanced model, exclusive to Ultra members. Runs page translation, Custom AI Actions, and every other Built-in AI feature on a shared weekly quota. Uses up the quota faster than the standard model.
       description:
         openai: Provides models like GPT-4o
         azure: Azure-hosted OpenAI models through your deployments
@@ -226,6 +246,7 @@ options:
         anthropic: Claude models known for safety and reasoning excellence
         xai: Elon Musk's AI company offering Grok models with real-time data access
         atlascloud: Unified OpenAI-compatible access to newer DeepSeek, Kimi, Qwen, Doubao, GLM, and other models
+        jalapenocloud: Enterprise-grade AI trusted by top LLM builders — now for you.
         siliconflow: High-performance inference platform for Chinese and international models
         tensdaq: Revolutionary bidding AI MaaS platform with market-driven pricing, eliminating high-cost fixed pricing
         openaiCompatible: Connect to a custom endpoint compatible with the OpenAI Chat Completions API
@@ -250,6 +271,7 @@ options:
         huggingface: Hugging Face Inference API providing access to thousands of open-source models
     apiKey:
       showAPIKey: Show API key
+      getAPIKey: Get API key
     howToConfigure: How to configure?
     testConnection:
       button: Test connection
@@ -261,18 +283,20 @@ options:
       title: Feature providers
       description: Choose which provider to use for each feature
       features:
-        translate: Page translation
-        selectionToolbar_translate: Selection toolbar translation
+        pageTranslation: Page translation
+        selectionTranslation: Selection toolbar translation
         inputTranslation: Input translation
         videoSubtitles: Video subtitles
+        noteSuggestion: Note suggestions
       descriptions:
-        translate: Translates the whole page in bilingual or replace mode.
-        selectionToolbar_translate: Translates the text you select from the selection toolbar.
+        pageTranslation: Translates the whole page in bilingual or replace mode.
+        selectionTranslation: Translates the text you select from the selection toolbar.
         inputTranslation: Translates what you type into an input box before you send it.
         videoSubtitles: Translates subtitles as they appear in a video player.
+        noteSuggestion: Suggests words worth saving to your Notebase after a selection translation.
     languageDetection:
       title: Language detection
-      description: Affects auto-translate language detection, skip-language detection, and Speaking voice selection accuracy.
+      description: Affects auto-translate language detection and Speaking voice selection accuracy.
       mode:
         basic: Basic
         llm: LLM
@@ -534,11 +558,13 @@ options:
       speak:
         title: Speak
         description: Show the speak button, which reads the selected text aloud
-      saveSuggestion:
-        title: Save suggestions
+      noteSuggestion:
+        title: Note suggestions
         description: After selection translation with an AI provider, suggest words to save to your Notebase
         action: Action
         actionDescription: The action that produces the suggestion
+        provider: Provider
+        providerDescription: The AI provider that generates the suggestion
     display:
       title: Display
       opacity:
@@ -1043,13 +1069,18 @@ options:
         description: Lets AI re-cut the subtitles into lines that read as sentences. It sets their timing too, so lines can drift out of sync. Needs an LLM translation provider.
     aiQuota:
       title: AI subtitles quota
-      description: Monthly usage of your AI subtitle transcription quota
+      description: AI speech recognition gets you accurate subtitles for any video
+      launchBonusPromo: Subscribe before $1 for an extra 300 transcription minutes
       loginRequired: Log in to view your AI subtitles quota
-      logIn: Log in
-      betaRequired: AI subtitles are in beta and not yet enabled for your account
-      betaApply: Apply for access
+      upgradeRequired: AI subtitles require a Pro or Ultra subscription
+      pools:
+        subscription: Monthly quota
+        launchBonus: Launch gift
+      resetsOn: Resets on $1
+      expiresOn: Expires on $1
       loadError: Unable to load your quota. Please try again later.
-      summary: Used $1 of $2 minutes, $3 remaining
+      remainingOf: $1 / $2 min left
+      used: Used $1 min
     style:
       title: Subtitle style
       description: Display mode, position, fonts, colors and background, set against a live preview
@@ -1193,6 +1224,7 @@ action:
   saveToNotebasePendingLoginDescription: After login, Read Frog will create the Notebase and save this result automatically.
   saveToNotebasePendingConnectedLoginDescription: After login, Read Frog will save to the connected Notebase when possible. If this account cannot use it, Read Frog will create a new Notebase and save this result.
   upgrade: Upgrade
+  updatePayment: Update payment
   openCustomActions: Open Custom AI Actions
   openNotebase: Open Notebase
   contextDetailsTitleLabel: Title
@@ -1200,13 +1232,13 @@ action:
   translation: Translation
   speak: Speak
   playing: Playing
-saveSuggestion:
+noteSuggestion:
   title: You might want to save
-  description: Save these words to your Notebase and review them anytime.
+  description: Choose which words to save to your Notebase and review anytime.
   save: Save
   saved: Saved
   staleSuggestion: This suggestion is out of date
-  toggleLabel: Show save suggestions
+  toggleLabel: Show note suggestions
 thinking:
   label: Thinking
   complete: Thinking complete
@@ -1216,7 +1248,7 @@ shortcutKeySelector:
   placeholder: Please enter the shortcut
 subtitles:
   loadingAiSubtitles: Loading AI subtitles… (estimated 3 min)
-  requestAiSubtitles: Request AI subtitles (Beta)
+  requestAiSubtitles: Request AI subtitles
   usingAiSubtitles: Using AI subtitles
   toggle:
     enabled: Subtitle translation on
@@ -1248,16 +1280,31 @@ subtitles:
     aiAuthFailed: API authentication failed, please check your API key
     aiServiceUnavailable: Translation service temporarily unavailable
     aiQuotaExceeded: Monthly AI subtitle quota used up
+    aiQuotaExceededWithReset: Monthly AI subtitle quota used up · resets on $1
+    aiLoginRequired: Log in to view your AI subtitles quota
+    aiSubscriptionRequired: AI subtitles require a Pro or Ultra subscription
+    aiPaymentRequired: Update your payment method to keep generating AI subtitles
+    aiVideoTooLong: This video is too long for AI subtitles
+    aiStillProcessing: Transcription is still running — click again in a few minutes to pick it up
     aiRequestFailed: AI subtitle request failed, please try again later
     aiNoResponse: AI service did not respond, using original text
     translatedExportFailed: Failed to generate translated subtitles
     translatedExportIncomplete: Failed to translate all subtitle lines
     translatedExportSameLanguage: Source and target languages are the same
 hostedAi:
+  ultraBadge:
+    tooltip: Requires the Ultra plan · Click the badge to get it
+  availability:
+    authenticationRequired: Log in to use this provider
+    ultraRequired: Ultra plan required
+    quotaExhausted: Quota used up
+    serviceUnavailable: Temporarily unavailable
+    usedPercent: "Quota used: $1%"
+    resetsAt: "Resets at $1"
   errors:
     rateLimited: Too many requests, please try again later.
-    guestRateLimited: Guest limit reached. Sign in to get more free AI requests.
-    userRateLimited: Too many requests. You have exceeded the free usage limit. Please try again later.
+    guestRateLimited: Too many guest requests. Please try again later.
+    userRateLimited: Too many requests. Please try again later.
 hotkey:
   control: Ctrl
   alt: Option

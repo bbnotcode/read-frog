@@ -11,6 +11,7 @@ import {
 } from "./prompt"
 import {
   buildDefaultProviderConfigList,
+  DEFAULT_PROVIDER_CONFIG,
   DEFAULT_PROVIDER_CONFIG_LIST,
   MICROSOFT_TRANSLATE_PROVIDER_ID,
 } from "./providers"
@@ -49,7 +50,7 @@ export const GOOGLE_DRIVE_TOKEN_STORAGE_KEY = "__googleDriveToken"
 
 export const THEME_STORAGE_KEY = "theme"
 export const DEFAULT_DETECTED_CODE = "eng" as const
-export const CONFIG_SCHEMA_VERSION = 94
+export const CONFIG_SCHEMA_VERSION = 98
 
 export const DEFAULT_FLOATING_BUTTON_POSITION = 0.66
 export const DEFAULT_FLOATING_BUTTON_SIDE: FloatingButtonSide = "right"
@@ -83,7 +84,7 @@ export const DEFAULT_CONFIG: Config = {
     level: "intermediate",
   },
   providersConfig: DEFAULT_PROVIDER_CONFIG_LIST,
-  translate: {
+  pageTranslation: {
     providerId: MICROSOFT_TRANSLATE_PROVIDER_ID,
     mode: "bilingual",
     modeShortcut: DEFAULT_TRANSLATION_MODE_SHORTCUT_KEY,
@@ -156,9 +157,13 @@ export const DEFAULT_CONFIG: Config = {
       },
     },
     customActions: [],
-    saveSuggestion: {
+    noteSuggestion: {
       enabled: true,
       actionId: BUILT_IN_DICTIONARY_ACTION_ID,
+      // Fresh installs always carry the OpenAI default provider; suggestions
+      // start working the moment the user adds their key, with no hosted plan
+      // requirement attached.
+      providerId: DEFAULT_PROVIDER_CONFIG.openai.id,
     },
   },
   sideContent: {
@@ -232,7 +237,7 @@ export const DEFAULT_CONFIG: Config = {
 /**
  * Translate features start on Microsoft Translate, which is reachable everywhere; a fresh
  * install is moved onto Google Translate afterwards where that endpoint answers — see
- * `promoteGoogleTranslateDefaultIfReachable`.
+ * `selectFreshTranslateProviders`.
  */
 export function buildFreshDefaultConfig(): Config {
   return {

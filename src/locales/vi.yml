@@ -132,12 +132,29 @@ options:
     configTitle: Cấu hình nhà cung cấp
     addProvider: Thêm nhà cung cấp
     builtInProvider: Nhà cung cấp tích hợp
+    builtInAiUsage:
+      title: Hạn mức AI tích hợp
+      remaining: "Còn lại $1%"
+      supportedFeatures: "Hỗ trợ $1 tính năng"
+      resetsAt: "Đặt lại lúc $1"
+      daily: Hạn mức mỗi ngày
+      weekly: Hạn mức mỗi tuần
+      features:
+        pageTranslation: Dịch trang
+        customAction: Hành động AI tùy chỉnh
+        noteSuggestion: Gợi ý ghi chú
+        selectionTranslation: Dịch vùng chọn
+        videoSubtitles: Phụ đề video
+        inputTranslation: Dịch đầu vào
+        languageDetection: Phát hiện ngôn ngữ
     sponsorCta: Nhận AI nhanh, tiết kiệm chi phí
+    sponsorCtaJalapenoCloud: Nhận ưu đãi giảm 50% GLM 5.2
     setApiKeyWarning:
       message: Hãy đặt API Key ở trang $1
     badges:
       featureCount: $1 tính năng
       sponsor: Tài trợ
+      sponsorJalapenoCloud: Miễn phí $$2
     dialog:
       title: Thêm nhà cung cấp mới
       groups:
@@ -166,6 +183,7 @@ options:
         confirm: Xóa
         cancel: Hủy
       atLeastOneLLMProvider: Cần ít nhất một nhà cung cấp dịch LLM.
+      featureWouldLoseProvider: 'Không thể xóa: "$1" sẽ không còn nhà cung cấp nào có thể chạy được.'
       duplicateProviderName: 'Tên nhà cung cấp trùng lặp "$1"'
       defaultProvider:
         translate: Đặt làm nhà cung cấp dịch mặc định
@@ -211,10 +229,12 @@ options:
     providers:
       name:
         builtInAi: AI tích hợp
+        builtInAiAdvance: AI tích hợp nâng cao
         customChatComplete: Tùy chỉnh Chat Complete
         customResponses: Tùy chỉnh Responses
       attribution:
-        builtInAi: Được cung cấp bởi Atlas Cloud. Hiện chỉ khả dụng cho Hành động AI tùy chỉnh. Để mở khóa trải nghiệm không giới hạn, bạn có thể mua tín dụng có chi phí rất hiệu quả trên trang web chính thức.
+        builtInAi: Mô hình tiêu chuẩn do Read Frog lưu trữ. Người dùng không có Ultra chỉ dùng được trong hành động AI tùy chỉnh; người dùng Ultra dùng được ở nhiều tính năng hơn.
+        builtInAiAdvance: Mô hình nâng cao do Read Frog lưu trữ, dành riêng cho thành viên Ultra. Dùng được ở mọi tính năng AI tích hợp — dịch trang, hành động AI tùy chỉnh và hơn nữa — với hạn mức tuần dùng chung. Tiêu hao hạn mức nhanh hơn mô hình tiêu chuẩn.
       description:
         openai: Cung cấp các mô hình như GPT-4o
         azure: Mô hình OpenAI lưu trữ trên Azure qua các bản triển khai của bạn
@@ -225,6 +245,7 @@ options:
         anthropic: Các mô hình Claude nổi tiếng về độ an toàn và khả năng suy luận xuất sắc
         xai: Công ty AI của Elon Musk cung cấp các mô hình Grok với truy cập dữ liệu thời gian thực
         atlascloud: Nền tảng hợp nhất tương thích OpenAI cho các mô hình mới như DeepSeek, Kimi, Qwen, Doubao và GLM
+        jalapenocloud: AI cấp doanh nghiệp được các nhà phát triển LLM hàng đầu tin dùng, giờ đây dành cho bạn
         siliconflow: Nền tảng suy luận hiệu suất cao cho các mô hình Trung Quốc và quốc tế
         tensdaq: Nền tảng MaaS đấu giá AI cách mạng với giá thị trường, loại bỏ giá cố định cao
         openaiCompatible: Kết nối với endpoint tùy chỉnh tương thích với OpenAI Chat Completions API
@@ -249,6 +270,7 @@ options:
         huggingface: API suy luận Hugging Face cung cấp quyền truy cập hàng nghìn mô hình mã nguồn mở
     apiKey:
       showAPIKey: Hiển thị API Key
+      getAPIKey: Lấy API Key
     howToConfigure: Cấu hình như thế nào?
     testConnection:
       button: Kiểm tra kết nối
@@ -260,18 +282,20 @@ options:
       title: Nhà cung cấp tính năng
       description: Chọn nhà cung cấp sử dụng cho mỗi tính năng
       features:
-        translate: Dịch trang
-        selectionToolbar_translate: Dịch thanh công cụ chọn
+        pageTranslation: Dịch trang
+        selectionTranslation: Dịch thanh công cụ chọn
         inputTranslation: Dịch đầu vào
         videoSubtitles: Phụ đề video
+        noteSuggestion: Gợi ý ghi chú
       descriptions:
-        translate: Dịch toàn bộ trang ở chế độ song ngữ hoặc thay thế bản gốc.
-        selectionToolbar_translate: Dịch đoạn văn bản bạn chọn từ thanh công cụ bôi đen.
+        pageTranslation: Dịch toàn bộ trang ở chế độ song ngữ hoặc thay thế bản gốc.
+        selectionTranslation: Dịch đoạn văn bản bạn chọn từ thanh công cụ bôi đen.
         inputTranslation: Dịch nội dung bạn gõ trong ô nhập trước khi gửi.
         videoSubtitles: Dịch phụ đề hiện ra trong trình phát video.
+        noteSuggestion: Gợi ý các từ đáng lưu vào Notebase sau khi dịch vùng chọn.
     languageDetection:
       title: Phát hiện ngôn ngữ
-      description: Ảnh hưởng đến phát hiện ngôn ngữ tự động dịch, phát hiện ngôn ngữ bỏ qua và độ chính xác chọn giọng nói.
+      description: Ảnh hưởng đến phát hiện ngôn ngữ tự động dịch và độ chính xác chọn giọng nói.
       mode:
         basic: Cơ bản
         llm: LLM
@@ -533,11 +557,13 @@ options:
       speak:
         title: Đọc
         description: Hiển thị nút đọc, dùng để đọc to văn bản đã chọn
-      saveSuggestion:
-        title: Gợi ý lưu
+      noteSuggestion:
+        title: Gợi ý ghi chú
         description: Sau khi dịch vùng chọn bằng nhà cung cấp AI, gợi ý các từ để lưu vào Notebase
         action: Hành động
         actionDescription: Hành động tạo ra gợi ý
+        provider: Nhà cung cấp
+        providerDescription: Nhà cung cấp AI tạo ra gợi ý
     display:
       title: Hiển thị
       opacity:
@@ -927,13 +953,18 @@ options:
         description: AI cắt lại phụ đề thành những dòng đọc như câu hoàn chỉnh. AI cũng quyết định thời điểm hiện, nên dòng có thể lệch. Cần nhà cung cấp dịch LLM.
     aiQuota:
       title: Hạn mức phụ đề AI
-      description: Mức sử dụng hạn mức chuyển lời phụ đề AI trong tháng của bạn
+      description: AI dùng công nghệ nhận dạng giọng nói để tạo phụ đề chính xác cho mọi video
+      launchBonusPromo: Đăng ký trước $1 để nhận thêm 300 phút chuyển lời nói thành văn bản
       loginRequired: Đăng nhập để xem hạn mức phụ đề AI của bạn
-      logIn: Đăng nhập
-      betaRequired: Phụ đề AI đang ở giai đoạn beta và chưa được bật cho tài khoản của bạn
-      betaApply: Đăng ký sử dụng
+      upgradeRequired: Phụ đề AI cần gói Pro hoặc Ultra
+      pools:
+        subscription: Hạn mức hằng tháng
+        launchBonus: Quà ra mắt
+      resetsOn: Đặt lại vào $1
+      expiresOn: Hết hạn vào $1
       loadError: Không thể tải hạn mức. Vui lòng thử lại sau.
-      summary: Đã dùng $1 trong $2 phút, còn lại $3
+      remainingOf: Còn $1 / $2 phút
+      used: Đã dùng $1 phút
     style:
       title: Kiểu phụ đề
       description: Chế độ hiển thị, vị trí, phông chữ, màu sắc và nền, chỉnh ngay trên bản xem trước
@@ -1077,6 +1108,7 @@ action:
   saveToNotebasePendingLoginDescription: Sau khi đăng nhập, Read Frog sẽ tự động tạo Notebase và lưu kết quả này.
   saveToNotebasePendingConnectedLoginDescription: Sau khi đăng nhập, Read Frog sẽ lưu vào Notebase đã kết nối nếu có thể. Nếu tài khoản này không dùng được, Read Frog sẽ tạo Notebase mới và lưu kết quả này.
   upgrade: Nâng cấp
+  updatePayment: Cập nhật thanh toán
   openCustomActions: Mở Custom AI Actions
   openNotebase: Mở Notebase
   contextDetailsTitleLabel: Tiêu đề
@@ -1084,13 +1116,13 @@ action:
   translation: Dịch
   speak: Đọc
   playing: Đang phát
-saveSuggestion:
+noteSuggestion:
   title: Có thể bạn muốn lưu
-  description: Lưu những từ dưới đây vào Notebase để ôn tập bất cứ lúc nào.
+  description: Chọn những từ bạn muốn lưu vào Notebase để ôn tập bất cứ lúc nào.
   save: Lưu
   saved: Đã lưu
   staleSuggestion: Gợi ý này đã cũ
-  toggleLabel: Hiện gợi ý lưu
+  toggleLabel: Hiện gợi ý ghi chú
 thinking:
   label: Đang suy luận
   complete: Suy luận hoàn tất
@@ -1100,7 +1132,7 @@ shortcutKeySelector:
   placeholder: Vui lòng nhập phím tắt
 subtitles:
   loadingAiSubtitles: Đang tải phụ đề AI… (dự kiến 3 phút)
-  requestAiSubtitles: Yêu cầu phụ đề AI (Beta)
+  requestAiSubtitles: Yêu cầu phụ đề AI
   usingAiSubtitles: Đang dùng phụ đề AI
   toggle:
     enabled: Đã bật dịch phụ đề
@@ -1132,16 +1164,31 @@ subtitles:
     aiAuthFailed: Xác thực API thất bại, vui lòng kiểm tra API key của bạn
     aiServiceUnavailable: Dịch vụ dịch thuật tạm thời không khả dụng
     aiQuotaExceeded: Đã dùng hết hạn mức phụ đề AI trong tháng
+    aiQuotaExceededWithReset: Đã dùng hết hạn mức phụ đề AI trong tháng · đặt lại vào $1
+    aiLoginRequired: Đăng nhập để xem hạn mức phụ đề AI của bạn
+    aiSubscriptionRequired: Phụ đề AI cần gói Pro hoặc Ultra
+    aiPaymentRequired: Cập nhật phương thức thanh toán để tiếp tục tạo phụ đề AI
+    aiVideoTooLong: Video này quá dài để tạo phụ đề AI
+    aiStillProcessing: Quá trình phiên âm vẫn đang chạy — hãy bấm lại sau vài phút
     aiRequestFailed: Yêu cầu phụ đề AI thất bại, vui lòng thử lại sau
     aiNoResponse: Dịch vụ AI không phản hồi, hiển thị văn bản gốc
     translatedExportFailed: Không thể tạo phụ đề đã dịch
     translatedExportIncomplete: Không thể dịch tất cả các dòng phụ đề
     translatedExportSameLanguage: Ngôn ngữ nguồn và ngôn ngữ đích giống nhau
 hostedAi:
+  ultraBadge:
+    tooltip: Yêu cầu gói Ultra · Nhấp vào huy hiệu để nhận gói
+  availability:
+    authenticationRequired: Đăng nhập để sử dụng nhà cung cấp này
+    ultraRequired: Yêu cầu gói Ultra
+    quotaExhausted: Đã hết hạn mức
+    serviceUnavailable: Tạm thời không khả dụng
+    usedPercent: "Đã dùng hạn mức: $1%"
+    resetsAt: "Đặt lại lúc $1"
   errors:
     rateLimited: Quá nhiều yêu cầu, vui lòng thử lại sau.
-    guestRateLimited: Đã đạt giới hạn khách. Đăng nhập để nhận thêm lượt dùng AI miễn phí.
-    userRateLimited: Quá nhiều yêu cầu. Bạn đã vượt quá giới hạn miễn phí, vui lòng thử lại sau.
+    guestRateLimited: Quá nhiều yêu cầu từ khách. Vui lòng thử lại sau.
+    userRateLimited: Quá nhiều yêu cầu. Vui lòng thử lại sau.
 hotkey:
   control: Ctrl
   alt: Option
