@@ -35,20 +35,35 @@ export function mergeVocabularyStatusesByUpdatedAt(
   localUpdatedAt: Record<string, number>,
   syncedStatuses: Record<string, VocabularyStatus>,
   syncedUpdatedAt: Record<string, number>,
+  localDeletedAt: Record<string, number> = {},
+  syncedDeletedAt: Record<string, number> = {},
 ) {
   const statuses = { ...localStatuses }
   const updatedAt = { ...localUpdatedAt }
+  const deletedAt = { ...localDeletedAt }
 
-  Object.entries(syncedStatuses).forEach(([word, status]) => {
-    const incomingUpdatedAt = syncedUpdatedAt[word] ?? 0
-    const localWordUpdatedAt = updatedAt[word] ?? 0
-    if (!(word in statuses) || incomingUpdatedAt >= localWordUpdatedAt) {
-      statuses[word] = status
-      updatedAt[word] = incomingUpdatedAt
+  Object.entries(syncedDeletedAt).forEach(([word, incomingDeletedAt]) => {
+    if (!Number.isFinite(incomingDeletedAt) || incomingDeletedAt < 0) return
+    const localTimestamp = Math.max(updatedAt[word] ?? 0, deletedAt[word] ?? 0)
+    if (incomingDeletedAt >= localTimestamp) {
+      delete statuses[word]
+      delete updatedAt[word]
+      deletedAt[word] = incomingDeletedAt
     }
   })
 
-  return { statuses, updatedAt }
+  Object.entries(syncedStatuses).forEach(([word, status]) => {
+    const incomingUpdatedAt = syncedUpdatedAt[word] ?? 0
+    const localWordUpdatedAt = Math.max(updatedAt[word] ?? 0, deletedAt[word] ?? 0)
+    const hasLocalRecord = word in statuses || word in deletedAt
+    if (!hasLocalRecord || incomingUpdatedAt > localWordUpdatedAt) {
+      statuses[word] = status
+      updatedAt[word] = incomingUpdatedAt
+      delete deletedAt[word]
+    }
+  })
+
+  return { statuses, updatedAt, deletedAt }
 }
 
 function bucketKey(index: number) {
@@ -114,7 +129,7 @@ export async function mergeKnownWordsFromSync(
     for (let offset = 0; offset < bitmap.length; offset += 1) {
       if (bitmap[offset] !== "1") continue
       const word = indexedWords[bucketIndex * BUCKET_SIZE + offset]
-      if (word && statuses[word] === undefined) {
+      if (word && statuses[word] === undefined && state.deletedAt[word] === undefined) {
         statuses[word] = "known"
         changed = true
       }
@@ -220,6 +235,7 @@ export async function syncWordsToWordHunterGist(
   token: string,
   localStatuses: Record<string, VocabularyStatus>,
   localUpdatedAt: Record<string, number>,
+  localDeletedAt: Record<string, number> = {},
 ) {
   if (!token.trim()) throw new Error("写入 Gist 必须填写具有 Gist 权限的访问令牌")
   const gistId = parseGistId(gistUrlOrId)
@@ -233,12 +249,12 @@ export async function syncWordsToWordHunterGist(
       : {}
   const remoteReadFrog = remoteBackup.read_frog as
     | {
-        statuses?: Record<string, { status?: VocabularyStatus; updatedAt?: number }>
+        statuses?: Record<string, { status?: VocabularyStatus | null; updatedAt?: number }>
       }
     | undefined
   const mergedStatuses = Object.create(null) as Record<
     string,
-    { status: VocabularyStatus; updatedAt: number }
+    { status: VocabularyStatus | null; updatedAt: number }
   >
   Object.keys(remoteKnown).forEach((word) => {
     const normalized = normalizeSyncWord(word)
@@ -249,14 +265,17 @@ export async function syncWordsToWordHunterGist(
     if (
       normalized &&
       entry &&
-      ["known", "fuzzy", "unknown"].includes(entry.status ?? "") &&
+      (entry.status === null || ["known", "fuzzy", "unknown"].includes(entry.status ?? "")) &&
       typeof entry.updatedAt === "number" &&
       Number.isFinite(entry.updatedAt) &&
       entry.updatedAt >= 0
     ) {
-      mergedStatuses[normalized] = {
-        status: entry.status as VocabularyStatus,
-        updatedAt: entry.updatedAt,
+      const existing = mergedStatuses[normalized]
+      if (!existing || entry.updatedAt >= existing.updatedAt) {
+        mergedStatuses[normalized] = {
+          status: entry.status as VocabularyStatus | null,
+          updatedAt: entry.updatedAt,
+        }
       }
     }
   })
@@ -267,6 +286,13 @@ export async function syncWordsToWordHunterGist(
     const updatedAt = Number.isFinite(rawUpdatedAt) && rawUpdatedAt >= 0 ? rawUpdatedAt : 0
     if (!mergedStatuses[normalized] || updatedAt >= mergedStatuses[normalized].updatedAt) {
       mergedStatuses[normalized] = { status, updatedAt }
+    }
+  })
+  Object.entries(localDeletedAt).forEach(([word, deletedAt]) => {
+    const normalized = normalizeSyncWord(word)
+    if (!normalized || !Number.isFinite(deletedAt) || deletedAt < 0) return
+    if (!mergedStatuses[normalized] || deletedAt >= mergedStatuses[normalized].updatedAt) {
+      mergedStatuses[normalized] = { status: null, updatedAt: deletedAt }
     }
   })
   if (Object.keys(mergedStatuses).length > MAX_GIST_WORDS) {
@@ -310,10 +336,19 @@ export async function syncWordsToWordHunterGist(
   return {
     count: Object.keys(mergedKnown).length,
     statuses: Object.fromEntries(
-      Object.entries(mergedStatuses).map(([word, entry]) => [word, entry.status]),
+      Object.entries(mergedStatuses).flatMap(([word, entry]) =>
+        entry.status === null ? [] : [[word, entry.status]],
+      ),
     ) as Record<string, VocabularyStatus>,
     updatedAt: Object.fromEntries(
-      Object.entries(mergedStatuses).map(([word, entry]) => [word, entry.updatedAt]),
+      Object.entries(mergedStatuses).flatMap(([word, entry]) =>
+        entry.status === null ? [] : [[word, entry.updatedAt]],
+      ),
+    ),
+    deletedAt: Object.fromEntries(
+      Object.entries(mergedStatuses).flatMap(([word, entry]) =>
+        entry.status === null ? [[word, entry.updatedAt]] : [],
+      ),
     ),
   }
 }

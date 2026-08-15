@@ -13,6 +13,7 @@ describe("mergeVocabularyStatusesByUpdatedAt", () => {
     ).toEqual({
       statuses: { transient: "known" },
       updatedAt: { transient: 200 },
+      deletedAt: {},
     })
   })
 
@@ -27,6 +28,39 @@ describe("mergeVocabularyStatusesByUpdatedAt", () => {
     ).toEqual({
       statuses: { local: "fuzzy", updated: "known", remote: "fuzzy" },
       updatedAt: { local: 300, updated: 200, remote: 150 },
+      deletedAt: {},
+    })
+  })
+
+  it("keeps a newer local deletion instead of reviving an older remote word", () => {
+    expect(
+      mergeVocabularyStatusesByUpdatedAt(
+        {},
+        {},
+        { promise: "known" },
+        { promise: 100 },
+        { promise: 200 },
+      ),
+    ).toEqual({
+      statuses: {},
+      updatedAt: {},
+      deletedAt: { promise: 200 },
+    })
+  })
+
+  it("accepts a genuinely newer judgement after a deletion", () => {
+    expect(
+      mergeVocabularyStatusesByUpdatedAt(
+        {},
+        {},
+        { promise: "unknown" },
+        { promise: 300 },
+        { promise: 200 },
+      ),
+    ).toEqual({
+      statuses: { promise: "unknown" },
+      updatedAt: { promise: 300 },
+      deletedAt: {},
     })
   })
 })

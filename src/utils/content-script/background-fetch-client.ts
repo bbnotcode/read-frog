@@ -3,7 +3,7 @@ import { sendMessage } from "@/utils/message"
 
 export interface BackgroundFetchOptions extends Pick<
   ProxyRequest,
-  "cacheConfig" | "credentials" | "responseType"
+  "allowedHosts" | "cacheConfig" | "credentials" | "maxResponseBytes" | "responseType" | "timeoutMs"
 > {}
 
 function getRequestUrl(input: RequestInfo | URL) {
@@ -80,15 +80,19 @@ function buildProxyRequest(
   init?: RequestInit,
   options?: BackgroundFetchOptions,
 ): ProxyRequest {
-  return {
+  const request: ProxyRequest = {
     url: getRequestUrl(input),
     method: getRequestMethod(input, init),
     headers: getRequestHeaders(input, init),
     body: getRequestBody(init),
-    credentials: options?.credentials,
+    credentials: options?.credentials ?? "omit",
     cacheConfig: options?.cacheConfig,
     responseType: options?.responseType ?? "text",
   }
+  if (options?.timeoutMs !== undefined) request.timeoutMs = options.timeoutMs
+  if (options?.maxResponseBytes !== undefined) request.maxResponseBytes = options.maxResponseBytes
+  if (options?.allowedHosts !== undefined) request.allowedHosts = options.allowedHosts
+  return request
 }
 
 export async function backgroundFetch(

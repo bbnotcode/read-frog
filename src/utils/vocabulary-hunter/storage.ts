@@ -3,7 +3,7 @@ import { storage } from "#imports"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
 const VOCABULARY_HUNTER_SECRET_KEY = "local:vocabulary-hunter-secret"
-export const VOCABULARY_HUNTER_SCHEMA_VERSION = 2
+export const VOCABULARY_HUNTER_SCHEMA_VERSION = 3
 export type VocabularyDictionary = "haici" | "google" | "ai"
 const SUPPORTED_DICTIONARIES: VocabularyDictionary[] = ["haici", "google", "ai"]
 
@@ -23,7 +23,23 @@ export interface VocabularyHunterState {
   gistSyncError: string
   statuses: Record<string, VocabularyStatus>
   statusUpdatedAt: Record<string, number>
+  deletedAt: Record<string, number>
 }
+
+export type VocabularyHunterPreferences = Pick<
+  VocabularyHunterState,
+  | "enabled"
+  | "minimumLength"
+  | "enabledLevels"
+  | "enabledDictionaries"
+  | "dictionaryOrder"
+  | "unknownHighlightColor"
+  | "fuzzyHighlightColor"
+  | "gistId"
+  | "gistAutoSync"
+>
+
+export type VocabularyHunterPreferencePatch = Partial<VocabularyHunterPreferences>
 
 export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   schemaVersion: VOCABULARY_HUNTER_SCHEMA_VERSION,
@@ -41,6 +57,7 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   gistSyncError: "",
   statuses: {},
   statusUpdatedAt: {},
+  deletedAt: {},
 }
 
 interface VocabularyHunterSecret {
@@ -67,17 +84,24 @@ export function applyVocabularyWordUpdate(
   const normalized = word.trim().toLocaleLowerCase()
   if (!/^[a-z]+(?:'[a-z]+)?$/.test(normalized) || normalized.length > 64) return state
   if (!Number.isFinite(updatedAt) || updatedAt < 0) return state
-  if ((state.statusUpdatedAt[normalized] ?? 0) > updatedAt) return state
+  if (
+    Math.max(state.statusUpdatedAt[normalized] ?? 0, state.deletedAt[normalized] ?? 0) > updatedAt
+  ) {
+    return state
+  }
   const statuses = { ...state.statuses }
   const statusUpdatedAt = { ...state.statusUpdatedAt }
+  const deletedAt = { ...state.deletedAt }
   if (status === null) {
     delete statuses[normalized]
     delete statusUpdatedAt[normalized]
+    deletedAt[normalized] = updatedAt
   } else {
     statuses[normalized] = status
     statusUpdatedAt[normalized] = updatedAt
+    delete deletedAt[normalized]
   }
-  return { ...state, statuses, statusUpdatedAt }
+  return { ...state, statuses, statusUpdatedAt, deletedAt }
 }
 
 export function migrateVocabularyHunterState(
@@ -113,6 +137,7 @@ export function migrateVocabularyHunterState(
     dictionaryOrder,
     statuses,
     statusUpdatedAt: state.statusUpdatedAt ?? {},
+    deletedAt: state.deletedAt ?? {},
   }
 }
 

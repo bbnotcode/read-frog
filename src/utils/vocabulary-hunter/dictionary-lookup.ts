@@ -155,6 +155,10 @@ export async function lookupEmbeddedDictionary(
 
   const definition = DICTIONARIES[dictionary]
   let response = await backgroundFetch(definition.url(word), undefined, {
+    allowedHosts: [dictionary === "haici" ? "dict.cn" : "translate.googleapis.com"],
+    credentials: "omit",
+    timeoutMs: 12_000,
+    maxResponseBytes: 1_500_000,
     cacheConfig: {
       enabled: true,
       groupKey: "vocabulary-dictionary",

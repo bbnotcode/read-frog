@@ -20,6 +20,10 @@ import type {
   TTSPlaybackStopRequest,
 } from "@/types/tts-playback"
 import type { EdgeTTSVoice } from "@/utils/server/edge-tts/types"
+import type {
+  VocabularyHunterPreferencePatch,
+  VocabularyHunterState,
+} from "@/utils/vocabulary-hunter/storage"
 import { defineExtensionMessaging } from "@webext-core/messaging"
 
 interface ProtocolMap {
@@ -143,6 +147,14 @@ interface ProtocolMap {
     status: "known" | "fuzzy" | "unknown" | null
     updatedAt: number
   }) => Promise<{ applied: boolean }>
+  patchVocabularyPreferences: (
+    data: VocabularyHunterPreferencePatch,
+  ) => Promise<VocabularyHunterState>
+  mergeVocabularyWordData: (data: {
+    statuses: VocabularyHunterState["statuses"]
+    updatedAt: VocabularyHunterState["statusUpdatedAt"]
+    deletedAt?: VocabularyHunterState["deletedAt"]
+  }) => Promise<VocabularyHunterState>
   // cache management
   clearAllTranslationRelatedCache: () => Promise<void>
   clearAiSegmentationCache: () => Promise<void>

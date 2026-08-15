@@ -1,5 +1,8 @@
 import type { VocabularyStatus, VocabularyWordInfo } from "@/utils/vocabulary-hunter/candidates"
-import type { VocabularyDictionary } from "@/utils/vocabulary-hunter/storage"
+import type {
+  VocabularyDictionary,
+  VocabularyHunterPreferencePatch,
+} from "@/utils/vocabulary-hunter/storage"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/base-ui/button"
 import { Input } from "@/components/ui/base-ui/input"
@@ -19,7 +22,6 @@ import {
   getVocabularyHunterGistToken,
   getVocabularyHunterState,
   setVocabularyHunterGistToken,
-  setVocabularyHunterState,
   type VocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
 import {
@@ -28,7 +30,6 @@ import {
   readWordHunterBackup,
   syncKnownWord,
   syncKnownWords,
-  syncWordsToWordHunterGist,
 } from "@/utils/vocabulary-hunter/sync"
 import { PageLayout } from "../../components/page-layout"
 import { ConfigCard } from "./config-card"
@@ -226,13 +227,36 @@ export function VocabularyHunterPage() {
       setState(mergedState)
       setGistUrl(mergedState.gistId)
       setGistToken(savedGistToken)
-      if (mergedState !== currentState) await setVocabularyHunterState(mergedState)
+      if (mergedState !== currentState) {
+        const persisted = await sendMessage("mergeVocabularyWordData", {
+          statuses: mergedState.statuses,
+          updatedAt: mergedState.statusUpdatedAt,
+          deletedAt: mergedState.deletedAt,
+        })
+        setState(persisted)
+      }
     })
   }, [])
 
   const updateState = (next: VocabularyHunterState) => {
+    const patch: VocabularyHunterPreferencePatch = {}
+    if (next.enabled !== state.enabled) patch.enabled = next.enabled
+    if (next.minimumLength !== state.minimumLength) patch.minimumLength = next.minimumLength
+    if (next.enabledLevels !== state.enabledLevels) patch.enabledLevels = next.enabledLevels
+    if (next.enabledDictionaries !== state.enabledDictionaries) {
+      patch.enabledDictionaries = next.enabledDictionaries
+    }
+    if (next.dictionaryOrder !== state.dictionaryOrder) patch.dictionaryOrder = next.dictionaryOrder
+    if (next.unknownHighlightColor !== state.unknownHighlightColor) {
+      patch.unknownHighlightColor = next.unknownHighlightColor
+    }
+    if (next.fuzzyHighlightColor !== state.fuzzyHighlightColor) {
+      patch.fuzzyHighlightColor = next.fuzzyHighlightColor
+    }
+    if (next.gistId !== state.gistId) patch.gistId = next.gistId
+    if (next.gistAutoSync !== state.gistAutoSync) patch.gistAutoSync = next.gistAutoSync
     setState(next)
-    void setVocabularyHunterState(next)
+    if (Object.keys(patch).length > 0) void sendMessage("patchVocabularyPreferences", patch)
   }
 
   const words = useMemo(() => {
@@ -373,15 +397,18 @@ export function VocabularyHunterPage() {
           (word) => dictionary.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase(),
         ),
       )
-      const statuses = { ...state.statuses }
-      const statusUpdatedAt = { ...state.statusUpdatedAt }
+      const statuses: VocabularyHunterState["statuses"] = {}
+      const statusUpdatedAt: VocabularyHunterState["statusUpdatedAt"] = {}
       const importedAt = Date.now()
       lemmas.forEach((word) => {
         statuses[word] = "known"
         statusUpdatedAt[word] = importedAt
       })
-      const nextState = { ...state, statuses, statusUpdatedAt }
-      updateState(nextState)
+      const nextState = await sendMessage("mergeVocabularyWordData", {
+        statuses,
+        updatedAt: statusUpdatedAt,
+      })
+      setState(nextState)
       await syncKnownWords(lemmas, dictionary)
       setSyncMessage(`已从${source}导入并同步 ${lemmas.size} 个已掌握单词`)
     } catch (error) {
@@ -410,35 +437,18 @@ export function VocabularyHunterPage() {
     setGistLoading(true)
     setSyncMessage("")
     try {
-      const result = await syncWordsToWordHunterGist(
-        gistUrl,
-        gistToken,
-        state.statuses,
-        state.statusUpdatedAt,
-      )
-      const statuses: VocabularyHunterState["statuses"] = {}
-      const statusUpdatedAt: Record<string, number> = {}
-      const mergedWords = new Set<string>()
-      Object.entries(result.statuses).forEach(([word, status]) => {
-        const lemma = dictionary.get(word.toLocaleLowerCase())?.lemma ?? word.toLocaleLowerCase()
-        statuses[lemma] = status
-        statusUpdatedAt[lemma] = result.updatedAt[word] ?? 0
-        if (status === "known") mergedWords.add(lemma)
-      })
-      await syncKnownWords(mergedWords, dictionary)
-      const nextState = {
-        ...state,
-        statuses,
-        statusUpdatedAt,
+      await setVocabularyHunterGistToken(gistToken)
+      await sendMessage("patchVocabularyPreferences", {
         gistId: gistUrl.trim(),
         gistAutoSync: true,
-        gistLastSyncAt: Date.now(),
-        gistLastSyncCount: result.count,
-        gistSyncError: "",
-      }
-      await setVocabularyHunterGistToken(gistToken)
-      updateState(nextState)
-      setSyncMessage(`同步成功：Gist 中共有 ${result.count} 个已掌握单词，自动同步已开启`)
+      })
+      const result = await sendMessage("syncVocabularyGist", undefined)
+      const nextState = await getVocabularyHunterState()
+      setState(nextState)
+      if (!result.ok) throw new Error(nextState.gistSyncError || "同步到 Gist 失败")
+      setSyncMessage(
+        `同步成功：Gist 中共有 ${nextState.gistLastSyncCount} 个已掌握单词，自动同步已开启`,
+      )
     } catch (error) {
       setSyncMessage(error instanceof Error ? error.message : "同步到 Gist 失败")
     } finally {

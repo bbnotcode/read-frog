@@ -22,7 +22,6 @@ import {
 } from "@/utils/vocabulary-hunter/interactive-target"
 import {
   getVocabularyHunterState,
-  setVocabularyHunterState,
   type VocabularyHunterState,
   type VocabularyDictionary,
   watchVocabularyHunterState,
@@ -330,8 +329,11 @@ async function start(ctx: ContentScriptContext) {
       () => state,
     )
     if (mergedState !== state) {
-      state = mergedState
-      await setVocabularyHunterState(state)
+      state = await sendMessage("mergeVocabularyWordData", {
+        statuses: mergedState.statuses,
+        updatedAt: mergedState.statusUpdatedAt,
+        deletedAt: mergedState.deletedAt,
+      })
     }
   }
   let trackedRanges: TrackedRange[] = []
@@ -360,7 +362,8 @@ async function start(ctx: ContentScriptContext) {
   const sourceLink = shadow.querySelector<HTMLAnchorElement>("#source-link")!
   const tabs = shadow.querySelector<HTMLElement>("#tabs")!
 
-  const save = () => setVocabularyHunterState(state)
+  const saveDictionaryOrder = () =>
+    sendMessage("patchVocabularyPreferences", { dictionaryOrder: state.dictionaryOrder })
 
   const scheduleGistAutoSync = () => {
     clearTimeout(gistSyncTimer)
@@ -781,7 +784,7 @@ async function start(ctx: ContentScriptContext) {
     order.splice(order.indexOf(targetDictionary), 0, draggedDictionary)
     state = { ...state, dictionaryOrder: order }
     applyDictionaryOrder()
-    void save()
+    void saveDictionaryOrder()
     suppressDictionaryClick = true
     setTimeout(() => {
       suppressDictionaryClick = false

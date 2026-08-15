@@ -22,4 +22,7 @@ export interface ProxyRequest {
   redirect?: RequestRedirect
   cacheConfig?: CacheConfig
   responseType?: "text" | "base64"
+  timeoutMs?: number
+  maxResponseBytes?: number
+  allowedHosts?: string[]
 }

@@ -29,6 +29,27 @@ describe("applyVocabularyWordUpdate", () => {
     expect(applyVocabularyWordUpdate(current, " Promise ", null, 200)).toMatchObject({
       statuses: {},
       statusUpdatedAt: {},
+      deletedAt: { promise: 200 },
+    })
+  })
+
+  it("does not let an older synced judgement revive a deleted word", () => {
+    const deleted = applyVocabularyWordUpdate(
+      {
+        ...DEFAULT_VOCABULARY_HUNTER_STATE,
+        statuses: { promise: "known" },
+        statusUpdatedAt: { promise: 100 },
+      },
+      "promise",
+      null,
+      200,
+    )
+
+    expect(applyVocabularyWordUpdate(deleted, "promise", "known", 150)).toBe(deleted)
+    expect(applyVocabularyWordUpdate(deleted, "promise", "unknown", 300)).toMatchObject({
+      statuses: { promise: "unknown" },
+      statusUpdatedAt: { promise: 300 },
+      deletedAt: {},
     })
   })
 })
@@ -47,6 +68,7 @@ describe("migrateVocabularyHunterState", () => {
       missing: "unknown",
     })
     expect(migrated.statusUpdatedAt).toEqual({ remembered: 10 })
+    expect(migrated.deletedAt).toEqual({})
   })
 
   it("repairs unsupported dictionary configuration", () => {

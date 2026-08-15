@@ -43,40 +43,10 @@ export function proxyFetch() {
       ) {
         // Check against defined auth cookie patterns
         if (AUTH_COOKIE_PATTERNS.some((name) => cookie.name.includes(name))) {
-          // Get current cookie value for before/after comparison
-          let beforeValue: string | undefined
-          let afterValue: string | undefined
-
-          if (removed) {
-            // Cookie was removed - before value was the cookie value, after is undefined
-            beforeValue = cookie.value
-            afterValue = undefined
-          } else {
-            // Cookie was added/updated - get the previous value by querying all cookies
-            try {
-              const existingCookies = await browser.cookies.getAll({
-                domain: cookie.domain,
-                name: cookie.name,
-              })
-              // If cookie exists, this was an update; if not, this was creation
-              beforeValue =
-                existingCookies.length > 0 && existingCookies[0]!.value !== cookie.value
-                  ? existingCookies[0]!.value
-                  : undefined
-              afterValue = cookie.value
-            } catch (error) {
-              logger.warn("[ProxyFetch] Could not retrieve previous cookie value:", error)
-              beforeValue = "unknown"
-              afterValue = cookie.value
-            }
-          }
-
           logger.info("[ProxyFetch] Auth cookie changed, invalidating cache:", {
             cookieName: cookie.name,
             domain: cookie.domain,
             removed,
-            beforeValue,
-            afterValue,
           })
           invalidateAllCache().catch((error) =>
             logger.error("[ProxyFetch] Failed to invalidate cache:", error),
@@ -88,8 +58,6 @@ export function proxyFetch() {
 
   // Proxy cross-origin fetches for content scripts and other contexts
   onMessage("backgroundFetch", async (message): Promise<ProxyResponse> => {
-    logger.info("[ProxyFetch] Background fetch:", message.data)
-
     const {
       url,
       method,
@@ -99,7 +67,23 @@ export function proxyFetch() {
       redirect,
       cacheConfig,
       responseType = "text",
+      timeoutMs,
+      maxResponseBytes,
+      allowedHosts,
     } = message.data
+
+    const targetUrl = new URL(url)
+    if (targetUrl.protocol !== "https:" && targetUrl.protocol !== "http:") {
+      throw new Error("Unsupported proxy URL protocol")
+    }
+    if (allowedHosts?.length && !allowedHosts.includes(targetUrl.hostname)) {
+      throw new Error("Proxy URL host is not allowed")
+    }
+    const safeTimeoutMs = Math.min(Math.max(timeoutMs ?? 30_000, 1_000), 60_000)
+    const safeMaxResponseBytes = Math.min(
+      Math.max(maxResponseBytes ?? 10 * 1024 * 1024, 1_024),
+      25 * 1024 * 1024,
+    )
 
     const {
       enabled: cacheEnabled = false,
@@ -109,23 +93,23 @@ export function proxyFetch() {
 
     async function getCached(
       reqMethod: string,
-      targetUrl: string,
+      cacheUrl: string,
     ): Promise<ProxyResponse | undefined> {
       if (!cacheEnabled) return undefined
 
       const sessionCache = await getSessionCache(cacheGroupKey)
-      return await sessionCache.get(reqMethod, targetUrl, cacheTtl)
+      return await sessionCache.get(reqMethod, cacheUrl, cacheTtl)
     }
 
     async function setCached(
       reqMethod: string,
-      targetUrl: string,
+      cacheUrl: string,
       resp: ProxyResponse,
     ): Promise<void> {
       if (!cacheEnabled) return
 
       const sessionCache = await getSessionCache(cacheGroupKey)
-      await sessionCache.set(reqMethod, targetUrl, resp)
+      await sessionCache.set(reqMethod, cacheUrl, resp)
     }
 
     async function invalidateCache(groupKey?: string): Promise<void> {
@@ -151,19 +135,44 @@ export function proxyFetch() {
       await invalidateCache(cacheGroupKey)
     }
 
-    const response = await fetch(url, {
-      method: finalMethod,
-      headers: headers ? new Headers(headers) : undefined,
-      body,
-      credentials: credentials ?? "include",
-      redirect,
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), safeTimeoutMs)
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: finalMethod,
+        headers: headers ? new Headers(headers) : undefined,
+        body,
+        credentials: credentials ?? "omit",
+        redirect,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      clearTimeout(timeout)
+      throw error
+    }
+
+    const declaredLength = Number(response.headers.get("content-length") ?? 0)
+    if (Number.isFinite(declaredLength) && declaredLength > safeMaxResponseBytes) {
+      clearTimeout(timeout)
+      throw new Error("Proxy response is too large")
+    }
 
     const responseHeaders: [string, string][] = [...response.headers.entries()]
-    const responseBody =
+    let responseBody: string
+    try {
+      responseBody =
+        responseType === "base64"
+          ? encodeArrayBufferToBase64(await response.arrayBuffer())
+          : await response.text()
+    } finally {
+      clearTimeout(timeout)
+    }
+    const responseBytes =
       responseType === "base64"
-        ? encodeArrayBufferToBase64(await response.arrayBuffer())
-        : await response.text()
+        ? Math.ceil((responseBody.length * 3) / 4)
+        : new TextEncoder().encode(responseBody).byteLength
+    if (responseBytes > safeMaxResponseBytes) throw new Error("Proxy response is too large")
 
     const result = {
       status: response.status,
@@ -172,8 +181,6 @@ export function proxyFetch() {
       body: responseBody,
       bodyEncoding: responseType,
     }
-
-    logger.info("[ProxyFetch] Response without cache:", result)
 
     // Handle caching based on response
     if (cacheEnabled) {

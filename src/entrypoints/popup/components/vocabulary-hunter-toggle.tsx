@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { Switch } from "@/components/ui/base-ui/switch"
+import { sendMessage } from "@/utils/message"
 import {
   getVocabularyHunterState,
-  setVocabularyHunterState,
   watchVocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
 
@@ -15,9 +15,8 @@ export function VocabularyHunterToggle() {
   }, [])
 
   const updateEnabled = async (nextEnabled: boolean) => {
-    const state = await getVocabularyHunterState()
     setEnabled(nextEnabled)
-    await setVocabularyHunterState({ ...state, enabled: nextEnabled })
+    await sendMessage("patchVocabularyPreferences", { enabled: nextEnabled })
   }
 
   return (

@@ -36,6 +36,8 @@ import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
 import {
+  mergeVocabularyWordData,
+  patchVocabularyPreferences,
   runVocabularyGistSync,
   setupVocabularyGistAutoSync,
   updateVocabularyWord,
@@ -86,6 +88,16 @@ export default defineBackground({
     onMessage("syncVocabularyGist", async () => ({ ok: await runVocabularyGistSync() }))
     onMessage("updateVocabularyWord", async (message) =>
       updateVocabularyWord(message.data.word, message.data.status, message.data.updatedAt),
+    )
+    onMessage("patchVocabularyPreferences", async (message) =>
+      patchVocabularyPreferences(message.data),
+    )
+    onMessage("mergeVocabularyWordData", async (message) =>
+      mergeVocabularyWordData(
+        message.data.statuses,
+        message.data.updatedAt,
+        message.data.deletedAt,
+      ),
     )
 
     setupSidePanelMessageHandler({
