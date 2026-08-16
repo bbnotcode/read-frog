@@ -6,12 +6,6 @@ export default defineConfig({
   // TODO: remove any
   plugins: [WxtVitest() as any, react()],
   test: {
-    // Vitest 4's process and worker-thread pools can time out while starting
-    // on macOS. VM threads avoid that startup path. A single worker also keeps
-    // the shared fake-browser and storage test doubles deterministic.
-    pool: "vmThreads",
-    maxWorkers: 1,
-    fileParallelism: false,
     exclude: [...configDefaults.exclude, "**/.claude/**", "**/repos/**"],
     environment: "node",
     environmentOptions: {
