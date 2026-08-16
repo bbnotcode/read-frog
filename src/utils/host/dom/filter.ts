@@ -210,7 +210,20 @@ export function isDontWalkIntoButTranslateAsChildElement(
   element: HTMLElement,
   config?: Config,
 ): boolean {
-  const dontWalkClass = element.classList.contains(NOTRANSLATE_CLASS)
+  // The document root is exempt from the `notranslate` class rule. This
+  // predicate means "don't descend, but let the parent translate this as one
+  // inline chunk" — <html> has no parent to fold that text into, so blocking it
+  // drops the whole document instead of merging it. Since #1992 moved the walk
+  // root from <body> to documentElement, a site that ships
+  // `<html class="notranslate">` (Telegram Web A does; Telegram Web K does not)
+  // aborts the walk on its very first check and page translation silently
+  // labels nothing at all. Honoring an explicit page-translation request over a
+  // root-level opt-out mirrors the existing decision to ignore the
+  // `translate="no"` attribute (#459). Nested `notranslate` elements — read
+  // frog's own injected UI included — still block normally.
+  const dontWalkClass =
+    element.classList.contains(NOTRANSLATE_CLASS) &&
+    element !== element.ownerDocument.documentElement
 
   const dontWalkTag = getEffectiveTagSet(config, "dontWalkButTranslateTags").has(element.tagName)
 
@@ -221,6 +234,27 @@ export function isDontWalkIntoButTranslateAsChildElement(
   // const dontWalkAttr = element.getAttribute('translate') === 'no'
 
   return dontWalkClass || dontWalkTag || dontWalkPreserveText
+}
+
+/**
+ * `PRE` is blocked by default because an authored `<pre>` in an HTML document
+ * holds code, logs or ASCII art, where translating would corrupt the content.
+ * A plain-text document is the opposite case: the browser renders a .txt URL as
+ * a single generated `<pre>` wrapping the whole file, so the blanket block
+ * leaves the page with no translatable content at all (reported on
+ * nifty.org story pages, which serve prose as text/plain).
+ *
+ * Only the exact `text/plain` type qualifies — JSON, markdown and XML viewers
+ * stay blocked. A site rule naming PRE in `dontWalkTags.add` still wins, since
+ * this exemption un-blocks what the defaults block; `excludeSelectors` remains
+ * available as the per-site escape hatch either way.
+ */
+function isPlainTextDocumentPre(element: HTMLElement, config: Config): boolean {
+  if (element.tagName !== "PRE" || element.ownerDocument.contentType !== "text/plain") {
+    return false
+  }
+  const { dontWalkTagsExplicitAdds } = getEffectiveSiteRule(config, window.location.href)
+  return !dontWalkTagsExplicitAdds?.has("PRE")
 }
 
 // https://github.com/mengxi-ream/read-frog/issues/940
@@ -242,7 +276,9 @@ export function isDontWalkIntoAndDontTranslateAsChildElement(
   // Cheap structural predicates first; the getComputedStyle check runs last
   // because it can force a style recalculation, and the full-page walk
   // evaluates this predicate for every element (#1881).
-  const dontWalkInvalidTag = getEffectiveTagSet(config, "dontWalkTags").has(element.tagName)
+  const dontWalkInvalidTag =
+    getEffectiveTagSet(config, "dontWalkTags").has(element.tagName) &&
+    !isPlainTextDocumentPre(element, config)
   if (dontWalkInvalidTag) return true
 
   const dontWalkHidden = element.hidden
