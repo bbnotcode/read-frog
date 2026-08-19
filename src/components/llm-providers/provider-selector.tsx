@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react"
 import type { Theme } from "@/types/config/theme"
 import type { ProviderSelectorOption } from "@/utils/providers/provider-display"
-import { UltraBadge } from "@/components/llm-providers/ultra-badge"
+import { PlanBadge } from "@/components/badges/plan-badge"
 import ProviderIcon from "@/components/provider-icon"
 import {
   Select,
@@ -18,7 +18,7 @@ import {
   getProviderLogo,
   getProviderName,
   isProviderSelectorOptionDisabled,
-  isProviderSelectorItem,
+  isSystemProviderSelectorItem,
 } from "@/utils/providers/provider-display"
 import { useTheme } from "../providers/theme-provider"
 
@@ -49,12 +49,13 @@ interface ProviderSelectorProps {
 export function getProviderSelectorGroups(
   providers: ProviderSelectorOption[],
 ): ProviderSelectorGroup[] {
-  const builtInProviders = providers.filter(isProviderSelectorItem)
+  const builtInProviders = providers.filter(isSystemProviderSelectorItem)
   const llmProviders = providers.filter(
-    (provider) => !isProviderSelectorItem(provider) && isLLMProviderConfig(provider),
+    (provider) => !isSystemProviderSelectorItem(provider) && isLLMProviderConfig(provider),
   )
   const pureTranslateProviders = providers.filter(
-    (provider) => !isProviderSelectorItem(provider) && isPureTranslateProviderConfig(provider),
+    (provider) =>
+      !isSystemProviderSelectorItem(provider) && isPureTranslateProviderConfig(provider),
   )
 
   // Built-in models sit last: the user's own configured providers are the
@@ -75,9 +76,9 @@ function ProviderOptionContent({
 }: {
   provider: ProviderSelectorOption
   theme: Theme
-  tooltipContainer?: ComponentProps<typeof UltraBadge>["tooltipContainer"]
+  tooltipContainer?: ComponentProps<typeof PlanBadge>["tooltipContainer"]
 }) {
-  const requiresUltra = isProviderSelectorItem(provider) && provider.requiresUltra === true
+  const requiresUltra = isSystemProviderSelectorItem(provider) && provider.requiresUltra === true
 
   return (
     <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
@@ -86,7 +87,13 @@ function ProviderOptionContent({
         name={getProviderName(provider)}
         size="sm"
       />
-      {requiresUltra && <UltraBadge tooltipContainer={tooltipContainer} />}
+      {requiresUltra && (
+        <PlanBadge
+          plan="ultra"
+          upgradeTooltip={i18n.t("hostedAi.ultraBadge.tooltip")}
+          tooltipContainer={tooltipContainer}
+        />
+      )}
     </div>
   )
 }

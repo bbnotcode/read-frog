@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react"
 import { useSelector } from "@tanstack/react-store"
 import { useAtomValue, useSetAtom } from "jotai"
 import { createContext, use, useState } from "react"
-import { UltraBadge } from "@/components/llm-providers/ultra-badge"
+import { PlanBadge } from "@/components/badges/plan-badge"
 import ProviderIcon from "@/components/provider-icon"
 import { useTheme } from "@/components/providers/theme-provider"
 import {
@@ -392,7 +392,9 @@ function AssignmentRow({
     <label className="flex w-fit items-center gap-2">
       <Switch checked={checked} disabled={checked || disabled} onCheckedChange={onCheckedChange} />
       <span className="text-sm">{children}</span>
-      {requiresUltra && <UltraBadge />}
+      {requiresUltra && (
+        <PlanBadge plan="ultra" upgradeTooltip={i18n.t("hostedAi.ultraBadge.tooltip")} />
+      )}
     </label>
   )
 }
@@ -436,7 +438,13 @@ function CompatibleFeatureAssignments() {
   })
 }
 
-function LanguageDetectionAssignment() {
+function LanguageDetectionAssignment({
+  disabled = false,
+  requiresUltra = false,
+}: {
+  disabled?: boolean
+  requiresUltra?: boolean
+} = {}) {
   const {
     state: {
       assignmentTarget: { providerId, providerType },
@@ -445,7 +453,9 @@ function LanguageDetectionAssignment() {
   } = useProviderEditor()
   const config = useAtomValue(configAtom)
 
-  if (!providerType || !isLLMProvider(providerType)) {
+  // Built-in providers have no local providerType, but declare this capability
+  // in the provider registry. Local non-LLM providers still cannot take it.
+  if (providerType && !isLLMProvider(providerType)) {
     return null
   }
 
@@ -455,6 +465,8 @@ function LanguageDetectionAssignment() {
   return (
     <AssignmentRow
       checked={isAssigned}
+      disabled={disabled}
+      requiresUltra={requiresUltra}
       onCheckedChange={(checked) => {
         if (checked) void actions.assignLanguageDetection()
       }}
