@@ -1184,6 +1184,7 @@ languageDetection:
 translation:
   sameLanguage: 來源語言和目標語言必須不同
   autoModeSameLanguage: 偵測到的語言「$1」與目標語言相同
+  extensionContextInvalidated: 擴充功能已更新，請重新整理此頁面後再試一次。
 speak:
   fetchingAudio: 正在取得音訊…
   playingAudio: 正在播放音訊…
@@ -1248,6 +1249,7 @@ shortcutKeySelector:
   placeholder: 請輸入快速鍵
 subtitles:
   loadingAiSubtitles: 正在載入 AI 字幕（預計 3 分鐘）
+  aiSubtitlesHint: 透過先進 AI 辨識語音生成準確字幕，無官方字幕時依然可用。
   requestAiSubtitles: 請求 AI 字幕
   usingAiSubtitles: 正在使用 AI 字幕
   toggle:

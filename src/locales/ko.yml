@@ -1068,6 +1068,7 @@ languageDetection:
 translation:
   sameLanguage: 원본 언어와 대상 언어는 달라야 합니다
   autoModeSameLanguage: 감지된 언어 '$1'은(는) 대상 언어와 같습니다
+  extensionContextInvalidated: 확장 프로그램이 업데이트되었습니다. 이 페이지를 새로고침한 후 다시 시도하세요.
 speak:
   fetchingAudio: 오디오 생성 중...
   playingAudio: 오디오 재생 중...
@@ -1132,6 +1133,7 @@ shortcutKeySelector:
   placeholder: 단축키를 입력해 주세요
 subtitles:
   loadingAiSubtitles: AI 자막 불러오는 중… (예상 3분)
+  aiSubtitlesHint: 첨단 AI 음성 인식으로 정확한 자막을 생성하며, 공식 자막이 없어도 사용할 수 있습니다.
   requestAiSubtitles: AI 자막 요청
   usingAiSubtitles: AI 자막 사용 중
   toggle:

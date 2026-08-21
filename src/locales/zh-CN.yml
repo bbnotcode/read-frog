@@ -1184,6 +1184,7 @@ languageDetection:
 translation:
   sameLanguage: 源语言和目标语言必须不同
   autoModeSameLanguage: 检测到的语言 '$1' 与目标语言相同
+  extensionContextInvalidated: 扩展已更新，请刷新此页面后重试。
 speak:
   fetchingAudio: 正在获取音频...
   playingAudio: 正在播放音频...
@@ -1248,6 +1249,7 @@ shortcutKeySelector:
   placeholder: 请输入快捷键
 subtitles:
   loadingAiSubtitles: 正在加载 AI 字幕中（预计 3 分钟）
+  aiSubtitlesHint: 通过先进 AI 识别语音生成准确字幕，无官方字幕时依然可用。
   requestAiSubtitles: 请求 AI 字幕
   usingAiSubtitles: 正在使用 AI 字幕中
   toggle:
