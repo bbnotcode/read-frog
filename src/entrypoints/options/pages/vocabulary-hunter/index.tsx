@@ -298,29 +298,29 @@ export function VocabularyHunterPage() {
     vocabularySort,
   ])
   const pageCount = Math.max(1, Math.ceil(words.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
   const pagedWords = useMemo(
-    () => words.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [page, words],
+    () => words.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, words],
   )
 
-  useEffect(() => {
-    setPage(1)
-  }, [filter, letterFilter, query, vocabularySort, vocabularyView])
-
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
-
-  useEffect(() => {
-    if (!selectedWord) {
-      setDefinition(null)
-      setDefinitionError("")
-      return undefined
-    }
-    let cancelled = false
+  const selectVocabularyWord = (word: string) => {
+    setSelectedWord(word)
     setDefinition(null)
     setDefinitionError("")
-    setDefinitionLoading(true)
+    setDefinitionLoading(Boolean(word))
+  }
+
+  const selectLookupDictionary = (nextDictionary: LookupDictionary) => {
+    setLookupDictionary(nextDictionary)
+    setDefinition(null)
+    setDefinitionError("")
+    setDefinitionLoading(Boolean(selectedWord))
+  }
+
+  useEffect(() => {
+    if (!selectedWord) return undefined
+    let cancelled = false
     void lookupEmbeddedDictionary(lookupDictionary, selectedWord)
       .then((result) => {
         if (!cancelled) setDefinition(result)
@@ -836,7 +836,10 @@ export function VocabularyHunterPage() {
                 key={status}
                 type="button"
                 className="group relative overflow-hidden rounded-2xl border bg-background p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                onClick={() => setFilter(status)}
+                onClick={() => {
+                  setFilter(status)
+                  setPage(1)
+                }}
               >
                 <span
                   className="absolute inset-y-0 left-0 w-1.5"
@@ -901,7 +904,10 @@ export function VocabularyHunterPage() {
                     key={item}
                     variant={filter === item ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setFilter(item)}
+                    onClick={() => {
+                      setFilter(item)
+                      setPage(1)
+                    }}
                   >
                     {item === "all"
                       ? `全部 ${counts.known + counts.fuzzy + counts.unknown}`
@@ -913,7 +919,10 @@ export function VocabularyHunterPage() {
                 <select
                   className="h-9 rounded-lg border bg-background px-3 text-sm"
                   value={vocabularySort}
-                  onChange={(event) => setVocabularySort(event.target.value as VocabularySort)}
+                  onChange={(event) => {
+                    setVocabularySort(event.target.value as VocabularySort)
+                    setPage(1)
+                  }}
                   aria-label="词汇排序"
                 >
                   <option value="difficulty">按难度排序</option>
@@ -947,7 +956,10 @@ export function VocabularyHunterPage() {
                 <Input
                   className="w-56 bg-background"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    setPage(1)
+                  }}
                   placeholder="搜索单词"
                 />
               </div>
@@ -960,7 +972,10 @@ export function VocabularyHunterPage() {
                     ? "text-muted-foreground hover:bg-background"
                     : "bg-foreground text-background"
                 }`}
-                onClick={() => setLetterFilter("")}
+                onClick={() => {
+                  setLetterFilter("")
+                  setPage(1)
+                }}
               >
                 全部
               </button>
@@ -973,7 +988,10 @@ export function VocabularyHunterPage() {
                       ? "bg-foreground text-background"
                       : "text-muted-foreground hover:bg-background"
                   }`}
-                  onClick={() => setLetterFilter(letterFilter === letter ? "" : letter)}
+                  onClick={() => {
+                    setLetterFilter(letterFilter === letter ? "" : letter)
+                    setPage(1)
+                  }}
                 >
                   {letter}
                 </button>
@@ -995,7 +1013,7 @@ export function VocabularyHunterPage() {
                     点击列表中的其他单词可直接切换，无需打开新网页。
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedWord("")}>
+                <Button variant="ghost" size="sm" onClick={() => selectVocabularyWord("")}>
                   收起
                 </Button>
               </div>
@@ -1006,7 +1024,7 @@ export function VocabularyHunterPage() {
                     key={item}
                     size="sm"
                     variant={lookupDictionary === item ? "default" : "outline"}
-                    onClick={() => setLookupDictionary(item)}
+                    onClick={() => selectLookupDictionary(item)}
                   >
                     {item === "haici" ? "海词" : "Google"}
                   </Button>
@@ -1081,7 +1099,7 @@ export function VocabularyHunterPage() {
                     className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-foreground/25 hover:bg-muted/40 ${
                       selectedWord === word ? "border-emerald-500 bg-emerald-50/60" : ""
                     }`}
-                    onClick={() => setSelectedWord(selectedWord === word ? "" : word)}
+                    onClick={() => selectVocabularyWord(selectedWord === word ? "" : word)}
                   >
                     <span className="truncate text-sm font-semibold">{word}</span>
                     <span
@@ -1104,7 +1122,7 @@ export function VocabularyHunterPage() {
                     <button
                       type="button"
                       className="min-w-0 text-left"
-                      onClick={() => setSelectedWord(selectedWord === word ? "" : word)}
+                      onClick={() => selectVocabularyWord(selectedWord === word ? "" : word)}
                     >
                       <span className="text-base font-semibold">{word}</span>
                       <span className="ml-3 text-xs text-muted-foreground">
@@ -1168,13 +1186,13 @@ export function VocabularyHunterPage() {
           {words.length > PAGE_SIZE && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 px-4 py-3">
               <span className="text-sm text-muted-foreground">
-                共 {words.length} 个词，第 {page} / {pageCount} 页，每页 {PAGE_SIZE} 个
+                共 {words.length} 个词，第 {currentPage} / {pageCount} 页，每页 {PAGE_SIZE} 个
               </span>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page <= 1}
+                  disabled={currentPage <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
                   上一页
@@ -1182,7 +1200,7 @@ export function VocabularyHunterPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page >= pageCount}
+                  disabled={currentPage >= pageCount}
                   onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
                 >
                   下一页
