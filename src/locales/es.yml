@@ -84,6 +84,15 @@ errorRecovery:
     confirm: Restablecer
     cancel: Cancelar
 options:
+  autosave:
+    invalid: Corrige los campos señalados antes de salir.
+    failed: No se pudieron guardar los cambios. Se han conservado aquí.
+    deleted: Este elemento se eliminó en otra página. Se han conservado tus cambios sin guardar.
+    retry: Reintentar
+    leaveTitle: Los cambios no se han guardado
+    leaveDescription: Puedes seguir editando para corregir el problema o descartar los cambios sin guardar.
+    keepEditing: Seguir editando
+    discard: Descartar cambios sin guardar
   batchSavings:
     savedCost: Ahorro aprox. del $1% en costes de API
   commandPalette:
@@ -836,7 +845,7 @@ options:
           bilingual: Bilingüe
           translationOnly: Solo traducción
         switched: "Modo de traducción: $1"
-        microsoftNotSupported: Microsoft Translator no admite el modo de solo traducción. Para activarlo, cambia a otro proveedor.
+        providerNotSupported: $1 no admite el modo de solo traducción. Para activarlo, cambia a otro proveedor.
       translateRange:
         title: Alcance de la traducción
         description: Selecciona si traducir solo el contenido principal o todo el contenido de la página.
@@ -1318,6 +1327,7 @@ subtitles:
     aiSubscriptionRequired: Los subtítulos con IA requieren una suscripción Pro o Ultra
     aiPaymentRequired: Actualiza tu método de pago para seguir generando subtítulos con IA
     aiVideoTooLong: Este video es demasiado largo para los subtítulos con IA
+    aiLiveReplayUnsupported: Los subtítulos con IA aún no están disponibles para repeticiones de transmisiones en vivo
     aiStillProcessing: La transcripción sigue en curso — vuelve a hacer clic en unos minutos para retomarla
     aiRequestFailed: Error al solicitar subtítulos con IA, inténtalo de nuevo más tarde
     aiNoResponse: El servicio AI no respondió; se usa el texto original

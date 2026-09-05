@@ -84,6 +84,15 @@ errorRecovery:
     confirm: Sıfırla
     cancel: İptal
 options:
+  autosave:
+    invalid: Ayrılmadan önce işaretli alanları düzeltin.
+    failed: Değişiklikler kaydedilemedi. Düzenlemeleriniz burada korunuyor.
+    deleted: Bu öğe başka bir sayfada silindi. Kaydedilmemiş düzenlemeleriniz korunuyor.
+    retry: Yeniden dene
+    leaveTitle: Değişiklikler kaydedilmedi
+    leaveDescription: Sorunu düzeltmek için düzenlemeye devam edin veya kaydedilmemiş değişiklikleri iptal edin.
+    keepEditing: Düzenlemeye devam et
+    discard: Kaydedilmemiş değişiklikleri iptal et
   batchSavings:
     savedCost: API maliyetlerinde yaklaşık %$1 tasarruf
   commandPalette:
@@ -720,7 +729,7 @@ options:
           bilingual: İki dilli
           translationOnly: Yalnızca çeviri
         switched: "Çeviri modu: $1"
-        microsoftNotSupported: Microsoft Çevirmen yalnızca çeviri modunu desteklemez. Etkinleştirmek için başka bir sağlayıcıya geçin.
+        providerNotSupported: $1 yalnızca çeviri modunu desteklemez. Etkinleştirmek için başka bir sağlayıcıya geçin.
       translateRange:
         title: Çeviri kapsamı
         description: Sayfadaki yalnızca ana içeriğin mi yoksa tüm içeriğin mi çevrileceğini seçin.
@@ -1202,6 +1211,7 @@ subtitles:
     aiSubscriptionRequired: Yapay zeka altyazıları için Pro veya Ultra aboneliği gerekir
     aiPaymentRequired: Yapay zeka altyazıları oluşturmaya devam etmek için ödeme yönteminizi güncelleyin
     aiVideoTooLong: Bu video yapay zeka altyazıları için çok uzun
+    aiLiveReplayUnsupported: Canlı yayın tekrarları için yapay zeka altyazıları henüz kullanılamıyor
     aiStillProcessing: Yazıya dökme hâlâ sürüyor — birkaç dakika sonra tekrar tıklayın
     aiRequestFailed: Yapay zeka altyazı isteği başarısız oldu, lütfen daha sonra tekrar deneyin
     aiNoResponse: AI hizmeti yanıt vermedi, orijinal metin gösteriliyor
