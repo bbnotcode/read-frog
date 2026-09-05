@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   applyVocabularyWordUpdate,
+  createVocabularyWordbookState,
+  DEFAULT_VOCABULARY_WORDBOOK,
   DEFAULT_VOCABULARY_HUNTER_STATE,
   migrateVocabularyHunterState,
   VOCABULARY_HUNTER_SCHEMA_VERSION,
@@ -52,6 +54,16 @@ describe("applyVocabularyWordUpdate", () => {
       deletedAt: {},
     })
   })
+
+  it("adds unknown words to the active wordbook and keeps them after status changes", () => {
+    const withBook = createVocabularyWordbookState(DEFAULT_VOCABULARY_HUNTER_STATE, "工作词汇")
+    const unknown = applyVocabularyWordUpdate(withBook, " Promise ", "unknown", 100)
+    expect(unknown.wordbooks["工作词汇"]).toEqual(["promise"])
+    expect(unknown.wordbookAddedAt["工作词汇"]).toEqual({ promise: 100 })
+    const known = applyVocabularyWordUpdate(unknown, "promise", "known", 200)
+    expect(known.wordbooks["工作词汇"]).toEqual(["promise"])
+    expect(known.wordbookAddedAt["工作词汇"]).toEqual({ promise: 100 })
+  })
 })
 
 describe("migrateVocabularyHunterState", () => {
@@ -69,6 +81,9 @@ describe("migrateVocabularyHunterState", () => {
     })
     expect(migrated.statusUpdatedAt).toEqual({ remembered: 10 })
     expect(migrated.deletedAt).toEqual({})
+    expect(migrated.activeWordbook).toBe(DEFAULT_VOCABULARY_WORDBOOK)
+    expect(migrated.wordbooks[DEFAULT_VOCABULARY_WORDBOOK]).toEqual(["missing"])
+    expect(migrated.wordbookAddedAt[DEFAULT_VOCABULARY_WORDBOOK]).toEqual({ missing: 0 })
   })
 
   it("repairs unsupported dictionary configuration", () => {

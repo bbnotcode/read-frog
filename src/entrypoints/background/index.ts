@@ -37,6 +37,7 @@ import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
 import {
+  createVocabularyWordbook,
   mergeVocabularyWordData,
   patchVocabularyPreferences,
   runVocabularyGistSync,
@@ -94,6 +95,9 @@ export default defineBackground({
     )
     onMessage("patchVocabularyPreferences", async (message) =>
       patchVocabularyPreferences(message.data),
+    )
+    onMessage("createVocabularyWordbook", async (message) =>
+      createVocabularyWordbook(message.data.name),
     )
     onMessage("mergeVocabularyWordData", async (message) =>
       mergeVocabularyWordData(

@@ -3,7 +3,8 @@ import { storage } from "#imports"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
 const VOCABULARY_HUNTER_SECRET_KEY = "local:vocabulary-hunter-secret"
-export const VOCABULARY_HUNTER_SCHEMA_VERSION = 3
+export const VOCABULARY_HUNTER_SCHEMA_VERSION = 5
+export const DEFAULT_VOCABULARY_WORDBOOK = "托福生词"
 export type VocabularyDictionary = "haici" | "google" | "ai"
 const SUPPORTED_DICTIONARIES: VocabularyDictionary[] = ["haici", "google", "ai"]
 
@@ -21,6 +22,9 @@ export interface VocabularyHunterState {
   gistLastSyncAt: number
   gistLastSyncCount: number
   gistSyncError: string
+  activeWordbook: string
+  wordbooks: Record<string, string[]>
+  wordbookAddedAt: Record<string, Record<string, number>>
   statuses: Record<string, VocabularyStatus>
   statusUpdatedAt: Record<string, number>
   deletedAt: Record<string, number>
@@ -37,6 +41,7 @@ export type VocabularyHunterPreferences = Pick<
   | "fuzzyHighlightColor"
   | "gistId"
   | "gistAutoSync"
+  | "activeWordbook"
 >
 
 export type VocabularyHunterPreferencePatch = Partial<VocabularyHunterPreferences>
@@ -55,6 +60,9 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   gistLastSyncAt: 0,
   gistLastSyncCount: 0,
   gistSyncError: "",
+  activeWordbook: DEFAULT_VOCABULARY_WORDBOOK,
+  wordbooks: { [DEFAULT_VOCABULARY_WORDBOOK]: [] },
+  wordbookAddedAt: { [DEFAULT_VOCABULARY_WORDBOOK]: {} },
   statuses: {},
   statusUpdatedAt: {},
   deletedAt: {},
@@ -101,7 +109,65 @@ export function applyVocabularyWordUpdate(
     statusUpdatedAt[normalized] = updatedAt
     delete deletedAt[normalized]
   }
-  return { ...state, statuses, statusUpdatedAt, deletedAt }
+  if (status !== "unknown") return { ...state, statuses, statusUpdatedAt, deletedAt }
+  const activeWordbook = normalizeVocabularyWordbookName(state.activeWordbook)
+  if (!activeWordbook) return { ...state, statuses, statusUpdatedAt, deletedAt }
+  const words = state.wordbooks[activeWordbook] ?? []
+  const wordbooks = words.includes(normalized)
+    ? state.wordbooks
+    : { ...state.wordbooks, [activeWordbook]: [...words, normalized].sort() }
+  const existingAddedAt = state.wordbookAddedAt[activeWordbook] ?? {}
+  const wordbookAddedAt = existingAddedAt[normalized]
+    ? state.wordbookAddedAt
+    : {
+        ...state.wordbookAddedAt,
+        [activeWordbook]: { ...existingAddedAt, [normalized]: updatedAt },
+      }
+  return { ...state, statuses, statusUpdatedAt, deletedAt, wordbooks, wordbookAddedAt }
+}
+
+export function normalizeVocabularyWordbookName(name: string) {
+  const normalized = name.trim().replace(/\s+/g, " ")
+  const reservedNames = new Set(["__proto__", "constructor", "prototype"])
+  const hasControlCharacter = Array.from(normalized).some((character) => {
+    const code = character.charCodeAt(0)
+    return code < 32 || code === 127
+  })
+  return normalized &&
+    normalized.length <= 40 &&
+    !hasControlCharacter &&
+    !reservedNames.has(normalized.toLocaleLowerCase())
+    ? normalized
+    : ""
+}
+
+function sanitizeWordbooks(wordbooks: Record<string, string[]> | undefined) {
+  const result: Record<string, string[]> = {}
+  Object.entries(wordbooks ?? {}).forEach(([rawName, rawWords]) => {
+    const name = normalizeVocabularyWordbookName(rawName)
+    if (!name || !Array.isArray(rawWords)) return
+    result[name] = [
+      ...new Set(
+        rawWords
+          .map((word) => word.trim().toLocaleLowerCase())
+          .filter((word) => /^[a-z]+(?:'[a-z]+)?$/.test(word) && word.length <= 64),
+      ),
+    ].sort()
+  })
+  return result
+}
+
+export function createVocabularyWordbookState(state: VocabularyHunterState, rawName: string) {
+  const name = normalizeVocabularyWordbookName(rawName)
+  if (!name) return state
+  return {
+    ...state,
+    activeWordbook: name,
+    wordbooks: state.wordbooks[name] ? state.wordbooks : { ...state.wordbooks, [name]: [] },
+    wordbookAddedAt: state.wordbookAddedAt[name]
+      ? state.wordbookAddedAt
+      : { ...state.wordbookAddedAt, [name]: {} },
+  }
 }
 
 export function migrateVocabularyHunterState(
@@ -125,6 +191,37 @@ export function migrateVocabularyHunterState(
     ...savedOrder,
     ...SUPPORTED_DICTIONARIES.filter((dictionary) => !savedOrder.includes(dictionary)),
   ]
+  const wordbooks = sanitizeWordbooks(state.wordbooks)
+  if (!wordbooks[DEFAULT_VOCABULARY_WORDBOOK]) wordbooks[DEFAULT_VOCABULARY_WORDBOOK] = []
+  if ((state.schemaVersion ?? 0) < 4) {
+    wordbooks[DEFAULT_VOCABULARY_WORDBOOK] = [
+      ...new Set([
+        ...wordbooks[DEFAULT_VOCABULARY_WORDBOOK],
+        ...Object.entries(statuses)
+          .filter(([, status]) => status === "unknown")
+          .map(([word]) => word),
+      ]),
+    ].sort()
+  }
+  const wordbookAddedAt = Object.fromEntries(
+    Object.entries(wordbooks).map(([name, words]) => {
+      const saved = state.wordbookAddedAt?.[name] ?? {}
+      return [
+        name,
+        Object.fromEntries(
+          words.map((word) => {
+            const timestamp = saved[word] ?? state.statusUpdatedAt?.[word] ?? 0
+            return [word, Number.isFinite(timestamp) && timestamp >= 0 ? timestamp : 0]
+          }),
+        ),
+      ]
+    }),
+  )
+  const requestedWordbook = normalizeVocabularyWordbookName(state.activeWordbook ?? "")
+  const activeWordbook =
+    requestedWordbook && wordbooks[requestedWordbook]
+      ? requestedWordbook
+      : DEFAULT_VOCABULARY_WORDBOOK
 
   return {
     ...DEFAULT_VOCABULARY_HUNTER_STATE,
@@ -135,6 +232,9 @@ export function migrateVocabularyHunterState(
         ? [...DEFAULT_VOCABULARY_HUNTER_STATE.enabledDictionaries]
         : enabledDictionaries,
     dictionaryOrder,
+    activeWordbook,
+    wordbooks,
+    wordbookAddedAt,
     statuses,
     statusUpdatedAt: state.statusUpdatedAt ?? {},
     deletedAt: state.deletedAt ?? {},

@@ -205,6 +205,12 @@ function createHoverCard() {
       .suggestion strong{display:block;color:#1683a2;font-size:14px}.suggestion span{display:block;margin-top:2px;color:#536159;font-size:12px;line-height:1.45}
       dl{margin:0;display:grid;gap:8px}dt{font-size:11px;color:#758078}dd{margin:2px 0 0;white-space:pre-wrap;
         font-size:13px;line-height:1.5}.close{padding:3px 7px;border:0;background:transparent;font-size:18px}
+      #toast{position:fixed;right:20px;bottom:20px;display:flex;align-items:center;gap:10px;max-width:min(360px,calc(100vw - 40px));
+        padding:12px 16px;border:1px solid #b9dfc7;border-radius:14px;background:linear-gradient(135deg,#f0fdf4,#fff);
+        color:#166534;box-shadow:0 14px 38px #1737212b;font-size:13px;font-weight:650;opacity:0;transform:translateY(12px) scale(.98);
+        transition:opacity .2s ease,transform .2s ease;pointer-events:none}
+      #toast::before{content:'✓';display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:#22c55e;color:#fff;font-weight:800}
+      #toast.open{opacity:1;transform:translateY(0) scale(1)}
     </style>
     <section id="card" role="dialog" aria-label="ReadFrog 生词卡">
       <div class="head">
@@ -225,6 +231,7 @@ function createHoverCard() {
       <div class="result" id="result"></div>
       <div class="row"><a id="source-link" target="_blank" rel="noreferrer" hidden>打开单词所在的页面链接</a></div>
     </section>
+    <div id="toast" role="status" aria-live="polite"></div>
   `
   document.documentElement.append(host)
   return { host, shadow }
@@ -342,6 +349,7 @@ async function start(ctx: ContentScriptContext) {
   let hideTimer: ReturnType<typeof setTimeout> | undefined
   let hoverTimer: ReturnType<typeof setTimeout> | undefined
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
+  let toastTimer: ReturnType<typeof setTimeout> | undefined
   let pendingHover: TrackedRange | null = null
   let selectedFromTextSelection = false
   let activeExternalRequestId: number | undefined
@@ -361,6 +369,14 @@ async function start(ctx: ContentScriptContext) {
   const result = shadow.querySelector<HTMLElement>("#result")!
   const sourceLink = shadow.querySelector<HTMLAnchorElement>("#source-link")!
   const tabs = shadow.querySelector<HTMLElement>("#tabs")!
+  const toast = shadow.querySelector<HTMLElement>("#toast")!
+
+  const showWordbookToast = (wordbookName: string) => {
+    clearTimeout(toastTimer)
+    toast.textContent = `已添加进「${wordbookName}」生词本`
+    toast.classList.add("open")
+    toastTimer = setTimeout(() => toast.classList.remove("open"), 2400)
+  }
 
   const saveDictionaryOrder = () =>
     sendMessage("patchVocabularyPreferences", { dictionaryOrder: state.dictionaryOrder })
@@ -843,6 +859,9 @@ async function start(ctx: ContentScriptContext) {
     }
     const update = await sendMessage("updateVocabularyWord", { word, status, updatedAt })
     if (!update.applied) state = await getVocabularyHunterState()
+    if (status === "unknown" && update.applied) {
+      showWordbookToast(state.activeWordbook)
+    }
     if (vocabularyDictionary) {
       void syncKnownWord(word, status === "known", vocabularyDictionary)
     }
@@ -978,6 +997,7 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hideTimer)
     clearTimeout(hoverTimer)
     clearTimeout(gistSyncTimer)
+    clearTimeout(toastTimer)
     observer.disconnect()
     cardResizeObserver.disconnect()
     window.removeEventListener("resize", keepCardInViewport)

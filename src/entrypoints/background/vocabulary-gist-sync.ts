@@ -2,9 +2,11 @@ import { browser } from "#imports"
 import { loadVocabularyDictionary } from "@/utils/vocabulary-hunter/dictionary-data"
 import {
   applyVocabularyWordUpdate,
+  createVocabularyWordbookState,
   getVocabularyHunterState,
   getVocabularyHunterGistToken,
   setVocabularyHunterState,
+  normalizeVocabularyWordbookName,
   type VocabularyHunterPreferencePatch,
   type VocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
@@ -64,6 +66,10 @@ function sanitizePreferencePatch(patch: VocabularyHunterPreferencePatch) {
     safe.gistId = patch.gistId.trim()
   }
   if (typeof patch.gistAutoSync === "boolean") safe.gistAutoSync = patch.gistAutoSync
+  if (typeof patch.activeWordbook === "string") {
+    const name = normalizeVocabularyWordbookName(patch.activeWordbook)
+    if (name) safe.activeWordbook = name
+  }
   return safe
 }
 
@@ -71,8 +77,20 @@ export function patchVocabularyPreferences(patch: VocabularyHunterPreferencePatc
   return enqueueStateUpdate(async () => {
     const latest = await getVocabularyHunterState()
     const safePatch = sanitizePreferencePatch(patch)
+    if (safePatch.activeWordbook && !latest.wordbooks[safePatch.activeWordbook]) {
+      delete safePatch.activeWordbook
+    }
     const next = { ...latest, ...safePatch }
     await setVocabularyHunterState(next)
+    return next
+  })
+}
+
+export function createVocabularyWordbook(name: string) {
+  return enqueueStateUpdate(async () => {
+    const latest = await getVocabularyHunterState()
+    const next = createVocabularyWordbookState(latest, name)
+    if (next !== latest) await setVocabularyHunterState(next)
     return next
   })
 }

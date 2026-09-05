@@ -42,6 +42,10 @@ type LookupDictionary = "haici" | "google"
 
 const PAGE_SIZE = 50
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")
+const todayForDateInput = () => {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
 
 const STATUS_LABELS = {
   known: "已掌握",
@@ -212,6 +216,9 @@ export function VocabularyHunterPage() {
   const [definition, setDefinition] = useState<EmbeddedDictionaryResult | null>(null)
   const [definitionLoading, setDefinitionLoading] = useState(false)
   const [definitionError, setDefinitionError] = useState("")
+  const [newWordbookName, setNewWordbookName] = useState("")
+  const [wordbookMessage, setWordbookMessage] = useState("")
+  const [wordbookExportDate, setWordbookExportDate] = useState(todayForDateInput)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -255,6 +262,7 @@ export function VocabularyHunterPage() {
     }
     if (next.gistId !== state.gistId) patch.gistId = next.gistId
     if (next.gistAutoSync !== state.gistAutoSync) patch.gistAutoSync = next.gistAutoSync
+    if (next.activeWordbook !== state.activeWordbook) patch.activeWordbook = next.activeWordbook
     setState(next)
     if (Object.keys(patch).length > 0) void sendMessage("patchVocabularyPreferences", patch)
   }
@@ -456,6 +464,44 @@ export function VocabularyHunterPage() {
     }
   }
 
+  const createWordbook = async () => {
+    const next = await sendMessage("createVocabularyWordbook", { name: newWordbookName })
+    if (next === state || next.activeWordbook !== newWordbookName.trim().replace(/\s+/g, " ")) {
+      setWordbookMessage("请输入 1–40 个字符的有效名称")
+      return
+    }
+    setState(next)
+    setNewWordbookName("")
+    setWordbookMessage(`已创建并切换到“${next.activeWordbook}”`)
+  }
+
+  const exportActiveWordbook = (date?: string) => {
+    const bookWords = state.wordbooks[state.activeWordbook] ?? []
+    const addedAt = state.wordbookAddedAt[state.activeWordbook] ?? {}
+    const dayStart = date ? new Date(`${date}T00:00:00`).getTime() : 0
+    const dayEnd = date ? new Date(`${date}T23:59:59.999`).getTime() : Number.POSITIVE_INFINITY
+    const exportedWords = bookWords
+      .filter(
+        (word) => !date || ((addedAt[word] ?? 0) >= dayStart && (addedAt[word] ?? 0) <= dayEnd),
+      )
+      .sort()
+    if (exportedWords.length === 0) {
+      setWordbookMessage(date ? `${date} 没有新增单词` : "当前生词本还没有单词")
+      return
+    }
+    const blob = new Blob([`${exportedWords.join("\n")}\n`], {
+      type: "text/plain;charset=utf-8",
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    const safeName = state.activeWordbook.replace(/[\\/:*?"<>|]/g, "-")
+    anchor.download = `${safeName}${date ? `-${date}` : ""}.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setWordbookMessage(`已导出 ${exportedWords.length} 个单词，每行一个`)
+  }
+
   return (
     <PageLayout
       title="生词猎手"
@@ -548,6 +594,60 @@ export function VocabularyHunterPage() {
               将它重新加入未掌握。快捷键会直接显示在悬浮卡按钮中；输入框和编辑区域内不会触发。
             </p>
           </div>
+        </div>
+      </ConfigCard>
+
+      <ConfigCard
+        layout="stacked"
+        title="生词本"
+        description="标记为未掌握的单词会自动加入当前生词本；默认使用“托福生词”。"
+      >
+        <div className="flex flex-col gap-4 rounded-xl border p-5">
+          <label className="grid gap-2">
+            <span className="text-sm font-medium">新单词加入到</span>
+            <select
+              className="h-10 rounded-lg border bg-background px-3 text-sm"
+              value={state.activeWordbook}
+              onChange={(event) => updateState({ ...state, activeWordbook: event.target.value })}
+            >
+              {Object.entries(state.wordbooks).map(([name, bookWords]) => (
+                <option key={name} value={name}>
+                  {name}（{bookWords.length}）
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={newWordbookName}
+              maxLength={40}
+              placeholder="新建生词本名称"
+              onChange={(event) => setNewWordbookName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void createWordbook()
+              }}
+            />
+            <Button variant="outline" disabled={!newWordbookName.trim()} onClick={createWordbook}>
+              新建并选中
+            </Button>
+          </div>
+          <div className="grid gap-2 rounded-xl bg-muted/50 p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <input
+              type="date"
+              className="h-10 rounded-lg border bg-background px-3 text-sm"
+              value={wordbookExportDate}
+              onChange={(event) => setWordbookExportDate(event.target.value)}
+            />
+            <Button onClick={() => exportActiveWordbook(wordbookExportDate)}>导出所选日期</Button>
+            <Button variant="outline" onClick={() => exportActiveWordbook()}>
+              导出全部
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            当前“{state.activeWordbook}”共有 {state.wordbooks[state.activeWordbook]?.length ?? 0}
+            个单词。单词之后改为已掌握或待巩固时，仍会保留在生词本中。
+          </p>
+          {wordbookMessage && <p className="text-sm text-emerald-700">{wordbookMessage}</p>}
         </div>
       </ConfigCard>
 

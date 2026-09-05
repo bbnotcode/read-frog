@@ -170,6 +170,7 @@ interface ProtocolMap {
   patchVocabularyPreferences: (
     data: VocabularyHunterPreferencePatch,
   ) => Promise<VocabularyHunterState>
+  createVocabularyWordbook: (data: { name: string }) => Promise<VocabularyHunterState>
   mergeVocabularyWordData: (data: {
     statuses: VocabularyHunterState["statuses"]
     updatedAt: VocabularyHunterState["statusUpdatedAt"]
