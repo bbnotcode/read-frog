@@ -24,6 +24,7 @@ import {
   setUpDatabaseCleanup,
 } from "./db-cleanup"
 import { setupEdgeTTSMessageHandlers } from "./edge-tts"
+import { setupGlossaryMessageHandlers } from "./glossary"
 import { setupHostedAiStatusHandler } from "./hosted-ai-status"
 import { setupIframeInjection } from "./iframe-injection"
 import { setupLLMGenerateTextMessageHandlers } from "./llm-generate-text"
@@ -169,6 +170,7 @@ export default defineBackground({
 
     proxyFetch()
     setupHostedAiStatusHandler()
+    setupGlossaryMessageHandlers()
     setupNotebasePendingSaveProcessor(() => backgroundReady)
     setupVocabularyGistAutoSync()
     setupEdgeTTSMessageHandlers()

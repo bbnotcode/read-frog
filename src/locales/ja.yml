@@ -103,6 +103,7 @@ options:
     toggle: サイドバーを切り替え
     settings: 設定
     features: 機能
+    translation: 翻訳
     product: 製品
   tools:
     translationHub: 翻訳ハブ
@@ -290,6 +291,7 @@ options:
     featureProviders:
       title: 機能プロバイダー
       description: 各機能に使用するプロバイダーを選択
+      chooseProvider: プロバイダーを選択
       features:
         pageTranslation: ページ翻訳
         selectionTranslation: 選択ツールバー翻訳
@@ -324,6 +326,8 @@ options:
       llmProviderNotConfigured: $1の LLM プロバイダー未選択
   patterns:
     duplicate: このパターンは既にリストにあります
+    gluedWildcard: "「*」はアドレスの一区切り全体を表す必要があります。例: *.example.com、example.*"
+    unsupported: このアドレスは照合できません。ポート指定と、http・https 以外のスキームには対応していません。
   preference:
     title: 環境設定
     pageDescription: Read Frog の外観、動作する範囲、設定の同期とバックアップ方法を指定します。
@@ -364,16 +368,17 @@ options:
       title: 設定
       googleDrive:
         title: Google Driveクラウド同期
-        description: リモートが新しい場合はダウンロード、ローカルが新しい場合はアップロード
+        description: リモートが新しい場合はダウンロード、ローカルが新しい場合はアップロード。用語集は専用のファイルで同期され、まるごと置き換えではなく用語ごとに統合されます。
         sync: Google Driveに同期
         syncing: 同期中...
         syncSuccess:
           uploaded: ローカル設定をクラウドにアップロードしました
           downloaded: リモート設定を適用しました
-          sameChanges: ローカルとリモートの変更が一致、同期しました
-          noChange: 既に同期済みです
-          unresolved: 競合を解決し、ローカルとクラウドに同期しました
-        syncError: 同期に失敗しました。もう一度お試しください
+          sameChanges: 両側の設定変更が同じため、同期しました
+          noChange: 設定は既に同期済みです
+          unresolved: 設定の競合を解決して同期しました
+        syncError: 設定の同期に失敗しました。もう一度お試しください
+        accountChangedError: ダイアログを開いている間にログイン中の Google アカウントが変わりました。何もアップロードしていません。もう一度同期してください。
         metadataCorrupted: 同期メタデータが破損しています。リモート設定を適用しました
         lastSyncTime: 最終同期時間
         logout: ログアウト
@@ -409,14 +414,50 @@ options:
             title: マージされた設定に検証エラーがあります
             description: 以下の差異を調整して修正してください：
           moreErrors: ...他 $1 件のエラー
+        glossary:
+          thisDevice: このデバイス
+          cloud: クラウド
+          deleted: 削除済み
+          disabled: 無効
+          upToDate: 用語集は同期済みです
+          uploaded: 用語集をクラウドにアップロードしました
+          merged: "用語集を同期しました: 追加 $1、更新 $2、削除 $3"
+          undo: 元に戻す
+          undone: 用語集を同期前の状態に戻しました
+          undoUnavailable: この操作は取り消せなくなりました — その後に用語集が変更されています。
+          retry: 同期中に用語集が変更されました。もう一度実行してください。
+          accountChangedRetry: ダイアログを開いている間にログイン中の Google アカウントが変わりました。何もアップロードしていません。もう一度同期してください。
+          busy: 別のタブが用語集を同期しています。
+          malformed: クラウドの用語集ファイルを読み取れなかったため、何も変更していません。
+          versionTooNew: その用語集ファイルは新しいバージョンの Read Frog で書かれています。先に拡張機能を更新してください。
+          duplicateFiles: クラウドに用語集ファイルが複数あります。何も変更していません。余分なファイルを削除してください。
+          capExceeded: "統合すると用語集の上限を $1 件超えるため、何も変更していません。"
+          failed: 用語集の同期に失敗しました
+          review:
+            title: この用語集の同期を確認
+            description: 2 つのコピーが食い違う箇所について、どちらを残すか選んでください。
+            firstSync: "このデバイスでの初回同期：クラウドから $1 件、アップロード $2 件。"
+            accountChanged: "現在 $1 でログインしています。このデバイスが前回同期したアカウントとは別のものです。このデバイスの用語集データ $2 件がこのアカウントにアップロードされます。このアカウントの用語集だけにしたい場合は、キャンセルして、このデバイスの用語集を削除してから、もう一度同期してください。"
+            destructive: "この同期は、このデバイスの用語集データ $2 件のうち $1 件を削除します。"
+            moreConflicts: "ほかに $1 件の相違は一覧にありません。いずれもマージの判断に従います。"
+            confirm: 同期
+            cancel: キャンセル
       manualSync:
         title: 手動設定同期
-        description: 手動で設定をインポート・エクスポート
+        description: 設定を手動でインポート・エクスポートします。用語集も一緒に含まれます
         import: インポート
         export: エクスポート
         importSuccess: 設定のインポートが完了しました
         exportSuccess: 設定のエクスポートが完了しました
+        exportGlossaryFailed: 設定はエクスポートされましたが、用語集を読み取れなかったためファイルに含まれていません。
         importError: インポートに失敗しました
+        glossaryImported: "用語 $1 件をインポートし、これまでの用語集を置き換えました。"
+        glossaryUndo: 元に戻す
+        glossaryUndone: 用語集をインポート前の状態に戻しました
+        glossaryUndoUnavailable: この操作は取り消せなくなりました — その後に用語集が変更されています。
+        glossaryMalformed: そのファイルの用語集を読み取れませんでした。何も変更していません。
+        glossaryVersionTooNew: そのファイルの用語集は新しいバージョンの Read Frog で書かれています。先に拡張機能を更新してください。
+        glossaryCapExceeded: "そのファイルの用語集データは上限 $2 件を $1 件超えています。何も変更していません。"
         exportOptions:
           title: エクスポートオプションを選択
           description: エクスポートする設定にAPIキーを含めるかどうかを選択してください。APIキーを含めると機密情報が漏洩する可能性があるため、安全な環境でのみ使用することをお勧めします。
@@ -455,13 +496,13 @@ options:
           confirm: 削除
       reset:
         title: 設定をリセット
-        description: すべての設定をデフォルト値にリセットします。
+        description: すべての設定を既定値に戻します。用語集は影響を受けません
         dialog:
           title: 設定をリセット
           trigger: 設定をリセット
           confirm: 確認
           cancel: キャンセル
-          description: この操作は、すべての設定をデフォルト値にリセットします。ご確認ください。
+          description: この操作はすべてのカスタム設定を消去し、既定値に戻します。用語集は保持されます — 削除する場合は用語集ページから行ってください。確認してください。
     userExperience:
       title: ユーザー体験
       beta:
@@ -710,6 +751,115 @@ options:
         outputSchemaRequired: 少なくとも1つの出力フィールドを追加してください
         fieldKeyRequired: フィールド名は必須です
         duplicateFieldKey: フィールド名は一意である必要があります
+  advanced:
+    title: 詳細設定
+    pageDescription: 普段は使わない、強力な設定です。
+    glossary:
+      title: 用語集
+      pageDescription: 大切な言葉に決まった訳語を指定し、それぞれの用語集を適用する範囲を選びます。
+      untitled: 無題の用語集
+      noGlossaries: 用語集がまだありません。
+      enable:
+        title: 有効にする
+        description: 一致した用語を LLM に渡し、指定どおりの訳語で出力させます。用語集はプロンプトに含めて送られるため、LLM プロバイダーで動作する機能にのみ適用されます。
+      library:
+        title: 登録した用語集
+        description: 用語集ごとに用語とウェブサイトの一覧を個別に持てるため、仕事用の用語がほかのすべてのページにまで付いて回ることはありません。
+        button: 用語集を追加
+        capReached: "用語集は最大 $1 件までです。"
+        termUsage: "すべての用語集を合わせて、$2 件中 $1 件の用語を使用しています。"
+      summary:
+        terms: "$1 件の用語"
+        termsOne: 1 件の用語
+        allSites: すべてのウェブサイト
+        sites: "$1 件のウェブサイト"
+        sitesOne: 1 件のウェブサイト
+      editor:
+        docsLink: 使い方は?
+        sections:
+          terms: 用語
+          maintenance: バックアップと削除
+        details:
+          title: 名前と説明
+          descriptionPlaceholder: 説明（任意）
+        enable:
+          title: 有効にする
+          description: 無効にした用語集は用語を保持しますが、いずれも送信されません。
+        sites:
+          title: ウェブサイト
+          description: この用語集を適用するウェブサイトを限定します。example.com はそのアドレスのみ、*.example.com はサブドメインも含み、example.com/docs/* はサイトの一部分だけに絞ります。
+          allSites: 空のままにすると、この用語集はすべてのウェブサイトに適用されます。
+          header: ウェブサイト
+        delete:
+          title: この用語集を削除
+          description: 用語集とその中のすべての用語を削除します。あとで用語を使う可能性があるなら先にエクスポートしてください。削除は元に戻せません。
+          dialog:
+            trigger: 削除
+            title: この用語集を削除しますか？
+            description: "この用語集と、その中の $1 件の用語がすべて完全に削除されます。この操作は元に戻せません。"
+            confirm: 削除
+            cancel: キャンセル
+      addTerm:
+        title: 用語を追加
+        description: 用語に使いたい訳語を指定できます。訳語を空欄にすると原文のままになります。
+      list:
+        title: 登録した用語
+        description: 段落に出現した用語だけが、その段落と一緒に送信されます。
+      importExport:
+        title: インポートとエクスポート
+        description: 用語は source, target, targetLanguage, caseSensitive の 4 列からなる CSV です。エクスポートが書き出す形式と同じです。
+      sourcePlaceholder: 用語
+      targetPlaceholder: 訳語（空欄なら原文のまま）
+      caseSensitive: 大文字と小文字を区別
+      add: 追加
+      searchPlaceholder: 用語を検索
+      columnEnabled: 有効
+      columnSource: 用語
+      columnTarget: 訳語
+      columnTargetLanguage: 翻訳先の言語
+      allLanguages: すべての言語
+      toggleTerm: "「$1」を使用"
+      editTerm: "「$1」を編集"
+      keepOriginal: 原文のまま
+      delete: 削除
+      save: 保存
+      cancel: キャンセル
+      loading: 読み込んでいます...
+      empty: 用語がまだありません。上から追加するか、CSV ファイルをインポートしてください。
+      noMatches: 検索に一致する用語はありません。
+      previous: 前へ
+      next: 次へ
+      pageOf: "$1 / $2"
+      addError:
+        emptySource: 先に用語を入力してください。
+        tooLong: この用語は長すぎます。
+        capReached: "すべての用語集を合わせた用語数が上限の $1 件に達しました。"
+        duplicate: この用語はすでに用語集にあります。
+      import: インポート
+      export: エクスポート
+      importModeMerge: リストに追加
+      importModeReplace: リストを置き換え
+      importEmpty: そのファイルに用語が見つかりませんでした。
+      importMissingHeader: "このファイルは Read Frog の用語集エクスポートではありません。次の列が必要です:"
+      importOverflow: "このインポートは上限を $1 件超えます。変更は行われていません。"
+      importSuccess: "$1 件を新規にインポートし、$2 件を更新しました。"
+      importSkipped: "無効な行 $1 件と重複 $2 件をスキップしました。"
+      importNoValidRows: いずれの行もインポートできませんでした。変更はありません。
+      importReplaceConfirm:
+        title: リスト全体を置き換えますか？
+        description: "この用語集の $1 件すべてが削除され（選択中の言語だけでなく、すべての対象言語が対象です）、このファイルの内容に置き換えられます。この操作は元に戻せません。"
+        confirm: 置き換える
+        cancel: キャンセル
+      deleteAll:
+        title: すべての用語を削除
+        description: 用語集を空にします。あとで使う可能性があるなら先にエクスポートしてください。削除は元に戻せません。
+        deleting: 削除中...
+        dialog:
+          title: すべての用語を削除
+          trigger: すべて削除
+          confirm: 確認
+          cancel: キャンセル
+          description: "$1 件の用語がすべて完全に削除されます。この操作は元に戻せません。"
   contextMenu:
     title: コンテキストメニュー
     pageDescription: ブラウザーの右クリックメニューに表示される Read Frog の項目を設定します。

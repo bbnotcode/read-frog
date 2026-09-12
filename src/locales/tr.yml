@@ -103,6 +103,7 @@ options:
     toggle: Kenar çubuğunu aç/kapat
     settings: Ayarlar
     features: Özellikler
+    translation: Çeviri
     product: Ürün
   tools:
     translationHub: Çeviri Merkezi
@@ -290,6 +291,7 @@ options:
     featureProviders:
       title: Özellik sağlayıcıları
       description: Her özellik için kullanılacak sağlayıcıyı seçin
+      chooseProvider: Sağlayıcı seç
       features:
         pageTranslation: Sayfa çevirisi
         selectionTranslation: Seçim araç çubuğu çevirisi
@@ -324,6 +326,8 @@ options:
       llmProviderNotConfigured: $1 için LLM sağlayıcısı seçilmedi
   patterns:
     duplicate: Bu desen zaten listede
+    gluedWildcard: '"*" adresin bir bölümünün tamamının yerini almalıdır, örneğin *.example.com veya example.*'
+    unsupported: Read Frog bu adresi eşleştiremiyor. Bağlantı noktaları ile http ve https dışındaki şemalar desteklenmiyor.
   preference:
     title: Tercihler
     pageDescription: Read Frog'un görünümünü, nerede çalışacağını ve yapılandırmanızın nasıl eşitlenip yedekleneceğini ayarlayın.
@@ -364,16 +368,17 @@ options:
       title: Yapılandırma
       googleDrive:
         title: Google Drive bulut senkronizasyonu
-        description: Uzak daha yeniyse indirir, yerel daha yeniyse yükler
+        description: Uzak daha yeniyse indirir, yerel daha yeniyse yükler. Sözlükleriniz kendi dosyasında taşınır ve tümüyle değiştirilmek yerine terim terim birleştirilir.
         sync: Google Drive'a Senkronize Et
         syncing: Senkronize ediliyor...
         syncSuccess:
           uploaded: Yerel ayarlar buluta yüklendi
           downloaded: Uzak ayarlar uygulandı
-          sameChanges: Yerel ve uzak değişiklikler aynı, senkronize edildi
-          noChange: Zaten güncel
-          unresolved: Çakışmalar çözüldü ve senkronize edildi
-        syncError: Senkronizasyon başarısız, lütfen tekrar deneyin
+          sameChanges: Her iki tarafta aynı ayar değişiklikleri, eşitlendi
+          noChange: Ayarlar zaten güncel
+          unresolved: Ayar çakışmaları çözüldü ve eşitlendi
+        syncError: Ayar eşitlemesi başarısız, lütfen tekrar deneyin
+        accountChangedError: İletişim kutusu açıkken oturum açılan Google hesabı değişti. Hiçbir şey yüklenmedi; yeniden eşitleyin.
         metadataCorrupted: Senkronizasyon meta verileri bozuk, uzak yapılandırma uygulandı
         lastSyncTime: Son senkronizasyon
         logout: Çıkış yap
@@ -409,14 +414,50 @@ options:
             title: Birleştirilmiş yapılandırmada doğrulama hataları var
             description: "Düzeltmek için aşağıdaki farklılıkları ayarlayın:"
           moreErrors: ...ve $1 hata daha
+        glossary:
+          thisDevice: Bu cihaz
+          cloud: Bulut
+          deleted: Silindi
+          disabled: kapalı
+          upToDate: Sözlükler zaten eşit
+          uploaded: Sözlükler buluta yüklendi
+          merged: "Sözlükler eşitlendi: $1 eklendi, $2 güncellendi, $3 silindi"
+          undo: Geri al
+          undone: Sözlükler eşitlemeden önceki haline döndürüldü
+          undoUnavailable: Bu geri alma artık kullanılamıyor — sözlükleriniz o zamandan beri değişti.
+          retry: Eşitleme sırasında sözlük değişti. Yeniden çalıştırın.
+          accountChangedRetry: İletişim kutusu açıkken oturum açılan Google hesabı değişti. Hiçbir şey yüklenmedi; yeniden eşitleyin.
+          busy: Başka bir sekme şu anda sözlüklerinizi eşitliyor.
+          malformed: Drive'daki sözlük dosyası okunamadı, bu yüzden hiçbir şey değişmedi.
+          versionTooNew: O sözlük dosyasını Read Frog'un daha yeni bir sürümü yazmış. Önce uzantıyı güncelleyin.
+          duplicateFiles: Drive'ınızda birden fazla sözlük dosyası var. Hiçbir şey değişmedi - lütfen fazla olanı silin.
+          capExceeded: "Birleştirme sözlük sınırını $1 aşardı. Hiçbir şey değişmedi."
+          failed: Sözlük eşitleme başarısız
+          review:
+            title: Bu sözlük eşitlemesini gözden geçirin
+            description: İki kopyanın ayrıldığı yerlerde neyin kalacağını seçin.
+            firstSync: "Bu cihazda ilk eşitleme: buluttan $1, yukarı $2."
+            accountChanged: "$1 olarak oturum açtınız; bu, cihazın en son eşitlediği hesap değil. Cihazdaki $2 sözlük satırı bu hesaba yüklenecek. Yalnızca bu hesabın sözlüklerini istiyorsanız iptal edin, buradakileri silin ve yeniden eşitleyin."
+            destructive: "Bu eşitleme, bu cihazdaki $2 sözlük satırının $1 tanesini siler."
+            moreConflicts: "Listelenmeyen $1 fark daha var. Her biri birleştirmenin kendi seçimini korur."
+            confirm: Eşitle
+            cancel: İptal
       manualSync:
         title: Manuel yapılandırma senkronizasyonu
-        description: Yapılandırma ayarlarınızı manuel olarak içe ve dışa aktarın
+        description: Ayarlarınızı elle içe ve dışa aktarın, sözlükleriniz de birlikte gelir
         import: İçe Aktar
         export: Dışa Aktar
         importSuccess: Yapılandırma başarıyla içe aktarıldı
         exportSuccess: Yapılandırma başarıyla dışa aktarıldı
+        exportGlossaryFailed: Ayarlarınız dışa aktarıldı, ancak sözlükleriniz okunamadı ve dosyada yer almıyor.
         importError: İçe aktarma başarısız
+        glossaryImported: "$1 terim içe aktarıldı ve önceki sözlükleriniz değiştirildi."
+        glossaryUndo: Geri al
+        glossaryUndone: Sözlükleriniz içe aktarmadan önceki haline döndürüldü
+        glossaryUndoUnavailable: Bu geri alma artık kullanılamıyor — sözlükleriniz o zamandan beri değişti.
+        glossaryMalformed: O dosyadaki sözlükler okunamadı. Hiçbir şey değişmedi.
+        glossaryVersionTooNew: O dosyadaki sözlükleri Read Frog'un daha yeni bir sürümü yazmış. Önce uzantıyı güncelleyin.
+        glossaryCapExceeded: "O dosyada $2 sınırından $1 fazla sözlük satırı var. Hiçbir şey değişmedi."
         exportOptions:
           title: Dışa aktarma seçeneklerini seçin
           description: Lütfen dışa aktarılan yapılandırmaya API Anahtarlarını dahil edip etmemeyi seçin. API Anahtarlarını dahil etmek hassas bilgileri sızdırabilir, bu nedenle yalnızca güvenli ortamlarda kullanılması önerilir.
@@ -455,13 +496,13 @@ options:
           confirm: Sil
       reset:
         title: Yapılandırmayı Sıfırla
-        description: Tüm yapılandırmayı varsayılan değere sıfırla
+        description: Tüm ayarları varsayılan değerlere sıfırla. Sözlükleriniz etkilenmez.
         dialog:
           title: Yapılandırmayı sıfırla
           trigger: Yapılandırmayı sıfırla
           confirm: Onayla
           cancel: İptal
-          description: Bu işlem tüm özel yapılandırmalarınızı temizleyecek ve varsayılan değerlere sıfırlayacaktır. Lütfen onaylayın.
+          description: Bu işlem tüm özel ayarlarınızı silip varsayılan değerlere döndürür. Sözlükleriniz korunur — silmek için sözlük sayfasını kullanın. Lütfen onaylayın.
     userExperience:
       title: Kullanıcı deneyimi
       beta:
@@ -710,6 +751,115 @@ options:
         outputSchemaRequired: En az bir çıktı alanı ekleyin
         fieldKeyRequired: Alan adı gerekli
         duplicateFieldKey: Alan adları benzersiz olmalıdır
+  advanced:
+    title: Gelişmiş
+    pageDescription: Her gün kullanılmayan, güçlü ayarlar.
+    glossary:
+      title: Terim sözlüğü
+      pageDescription: Sizin için önemli olan sözcüklere sabit bir çeviri verin ve her listenin nerede geçerli olacağını seçin.
+      untitled: Adsız terim sözlüğü
+      noGlossaries: Henüz terim sözlüğü yok.
+      enable:
+        title: Etkinleştir
+        description: Eşleşen terimleri LLM'ye gönderir, böylece onları istediğiniz gibi çevirir. Terim sözlüğü istemin içinde gönderilir, bu yüzden yalnızca LLM sağlayıcısı üzerinde çalışan özellikler için geçerlidir.
+      library:
+        title: Terim sözlükleriniz
+        description: Her terim sözlüğünün kendi terimleri ve kendi site listesi vardır; böylece iş için hazırladığınız terimler diğer her yerde karşınıza çıkmaz.
+        button: Terim sözlüğü ekle
+        capReached: "En fazla $1 terim sözlüğünüz olabilir."
+        termUsage: "Tüm terim sözlükleriniz için ayrılan toplam $2 terimin $1 tanesi kullanıldı."
+      summary:
+        terms: "$1 terim"
+        termsOne: 1 terim
+        allSites: Tüm web siteleri
+        sites: "$1 web sitesi"
+        sitesOne: 1 web sitesi
+      editor:
+        docsLink: Nasıl çalışır?
+        sections:
+          terms: Terimler
+          maintenance: Yedekleme ve silme
+        details:
+          title: Ad ve açıklama
+          descriptionPlaceholder: Açıklama (isteğe bağlı)
+        enable:
+          title: Etkinleştir
+          description: Devre dışı bırakılan bir terim sözlüğü terimlerini korur ama hiçbirini göndermez.
+        sites:
+          title: Web siteleri
+          description: Bu terim sözlüğünü belirli web siteleriyle sınırlayın. example.com yalnızca o adres; *.example.com alt alan adlarını ekler; example.com/docs/* siteyi tek bir bölüme daraltır.
+          allSites: Burayı boş bırakırsanız terim sözlüğü her yerde geçerli olur.
+          header: Web sitesi
+        delete:
+          title: Bu terim sözlüğünü sil
+          description: Terim sözlüğünü ve içindeki tüm terimleri kaldırır. Terimlere sonra ihtiyacınız olabilirse önce dışa aktarın — bu işlem geri alınamaz.
+          dialog:
+            trigger: Sil
+            title: Bu terim sözlüğü silinsin mi?
+            description: "Terim sözlüğü ve içindeki $1 terimin tamamı kalıcı olarak silinecek. Bu işlem geri alınamaz."
+            confirm: Sil
+            cancel: İptal
+      addTerm:
+        title: Terim ekle
+        description: Bir terime istediğiniz çeviriyi verin ya da özgün hâlini korumak için çeviriyi boş bırakın.
+      list:
+        title: Terimleriniz
+        description: Bir paragrafla yalnızca o paragrafta geçen terimler gönderilir.
+      importExport:
+        title: İçe ve dışa aktarma
+        description: Terimler source, target, targetLanguage ve caseSensitive sütunlarından oluşan bir CSV dosyasıdır — Dışa aktar bu dosyayı yazar.
+      sourcePlaceholder: Terim
+      targetPlaceholder: Çeviri (özgün hâlini korumak için boş bırakın)
+      caseSensitive: Büyük/küçük harfe duyarlı
+      add: Ekle
+      searchPlaceholder: Terim ara
+      columnEnabled: Etkin
+      columnSource: Terim
+      columnTarget: Çeviri
+      columnTargetLanguage: Hedef dil
+      allLanguages: Tüm diller
+      toggleTerm: "$1 terimini kullan"
+      editTerm: "$1 terimini düzenle"
+      keepOriginal: Özgün hâlini koru
+      delete: Sil
+      save: Kaydet
+      cancel: İptal
+      loading: Yükleniyor...
+      empty: Henüz terim yok. Yukarıdan ekleyin veya bir CSV dosyası içe aktarın.
+      noMatches: Aramanızla eşleşen terim yok.
+      previous: Önceki
+      next: Sonraki
+      pageOf: "$1 / $2"
+      addError:
+        emptySource: Önce bir terim girin.
+        tooLong: Bu terim çok uzun.
+        capReached: "Tüm terim sözlüklerinizdeki toplam terim sayısı $1 limitine ulaştı."
+        duplicate: Bu terim zaten sözlüğünüzde var.
+      import: İçe aktar
+      export: Dışa aktar
+      importModeMerge: Listeye ekle
+      importModeReplace: Listeyi değiştir
+      importEmpty: Bu dosyada terim bulunamadı.
+      importMissingHeader: "Bu dosya bir Read Frog sözlük dışa aktarımı değil. Şu sütunlar gerekli:"
+      importOverflow: "Bu içe aktarma limiti $1 terim aşacak. Hiçbir şey değiştirilmedi."
+      importSuccess: "$1 yeni terim içe aktarıldı, $2 terim güncellendi."
+      importSkipped: "$1 geçersiz satır ve $2 yinelenen terim atlandı."
+      importNoValidRows: Bu satırların hiçbiri içe aktarılamadı. Hiçbir şey değiştirilmedi.
+      importReplaceConfirm:
+        title: Listenin tamamı değiştirilsin mi?
+        description: "Bu sözlükteki $1 terimin tamamı silinecek — yalnızca seçili dil değil, tüm hedef diller — ve bu dosyanın içeriğiyle değiştirilecek. Bu işlem geri alınamaz."
+        confirm: Değiştir
+        cancel: İptal
+      deleteAll:
+        title: Tüm terimleri sil
+        description: Terim sözlüğünüzü boşaltır. Terimlere sonra ihtiyacınız olabilirse önce dışa aktarın — silme işlemi geri alınamaz.
+        deleting: Siliniyor...
+        dialog:
+          title: Tüm terimleri sil
+          trigger: Tümünü sil
+          confirm: Onayla
+          cancel: İptal
+          description: "$1 terimin tamamı kalıcı olarak silinecek. Bu işlem geri alınamaz."
   contextMenu:
     title: Bağlam Menüsü
     pageDescription: Tarayıcının sağ tık menüsündeki Read Frog seçeneklerini yönetin.

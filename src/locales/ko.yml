@@ -103,6 +103,7 @@ options:
     toggle: 사이드바 전환
     settings: 설정
     features: 기능
+    translation: 번역
     product: 제품
   tools:
     translationHub: 번역 허브
@@ -290,6 +291,7 @@ options:
     featureProviders:
       title: 기능 제공업체
       description: 각 기능에 사용할 제공업체를 선택
+      chooseProvider: 제공업체 선택
       features:
         pageTranslation: 페이지 번역
         selectionTranslation: 선택 툴바 번역
@@ -324,6 +326,8 @@ options:
       llmProviderNotConfigured: $1에 LLM 제공업체 미선택
   patterns:
     duplicate: 이 패턴은 이미 목록에 있습니다
+    gluedWildcard: '"*"는 주소의 한 구간 전체를 대신해야 합니다. 예: *.example.com, example.*'
+    unsupported: 이 주소는 일치시킬 수 없습니다. 포트와 http, https 이외의 스킴은 지원하지 않습니다.
   preference:
     title: 환경 설정
     pageDescription: Read Frog의 모양과 실행 범위, 설정 동기화 및 백업 방식을 지정하세요.
@@ -364,16 +368,17 @@ options:
       title: 설정
       googleDrive:
         title: Google Drive 클라우드 동기화
-        description: 원격이 최신이면 다운로드, 로컬이 최신이면 업로드
+        description: 원격이 최신이면 다운로드, 로컬이 최신이면 업로드. 용어집은 별도 파일로 오가며, 통째로 덮어쓰지 않고 항목별로 병합됩니다.
         sync: Google Drive 동기화
         syncing: 동기화 중...
         syncSuccess:
           uploaded: 로컬 설정이 클라우드에 업로드됨
           downloaded: 원격 설정이 적용됨
-          sameChanges: 로컬과 원격 변경 사항이 동일하여 동기화됨
-          noChange: 이미 동기화됨
-          unresolved: 충돌이 해결되고 로컬 및 클라우드에 동기화됨
-        syncError: 동기화 실패, 다시 시도해 주세요
+          sameChanges: 양쪽 설정 변경이 같아 동기화했습니다
+          noChange: 설정이 이미 동기화됨
+          unresolved: 설정 충돌을 해결하고 동기화했습니다
+        syncError: 설정 동기화 실패, 다시 시도해 주세요
+        accountChangedError: 대화 상자가 열려 있는 동안 로그인된 Google 계정이 바뀌었습니다. 아무것도 업로드하지 않았습니다. 다시 동기화하세요.
         metadataCorrupted: 동기화 메타데이터가 손상되어 원격 구성을 적용했습니다
         lastSyncTime: 마지막 동기화 시간
         logout: 로그아웃
@@ -409,14 +414,50 @@ options:
             title: 병합된 구성에 유효성 검사 오류가 있습니다
             description: "아래 차이점을 조정하여 수정하세요:"
           moreErrors: ...그리고 $1개의 오류가 더 있습니다
+        glossary:
+          thisDevice: 이 기기
+          cloud: 클라우드
+          deleted: 삭제됨
+          disabled: 사용 안 함
+          upToDate: 용어집이 이미 최신입니다
+          uploaded: 용어집을 클라우드에 업로드했습니다
+          merged: "용어집을 동기화했습니다: 추가 $1, 수정 $2, 삭제 $3"
+          undo: 실행 취소
+          undone: 용어집을 동기화 전 상태로 되돌렸습니다
+          undoUnavailable: 실행 취소를 더 이상 사용할 수 없습니다 — 이후 용어집이 변경되었습니다.
+          retry: 동기화 중에 용어집이 바뀌었습니다. 다시 실행해 주세요.
+          accountChangedRetry: 대화 상자가 열려 있는 동안 로그인된 Google 계정이 바뀌었습니다. 아무것도 업로드하지 않았습니다. 다시 동기화하세요.
+          busy: 다른 탭에서 용어집을 동기화하고 있습니다.
+          malformed: 클라우드의 용어집 파일을 읽을 수 없어 아무것도 변경하지 않았습니다.
+          versionTooNew: 해당 용어집 파일은 더 새로운 버전의 Read Frog가 저장한 것입니다. 먼저 확장 프로그램을 업데이트하세요.
+          duplicateFiles: 클라우드에 용어집 파일이 여러 개 있습니다. 아무것도 변경하지 않았으니 여분의 파일을 삭제해 주세요.
+          capExceeded: "병합하면 용어집 한도를 $1개 초과하므로 아무것도 변경하지 않았습니다."
+          failed: 용어집 동기화 실패
+          review:
+            title: 이번 용어집 동기화 확인
+            description: 두 사본이 다른 항목에 대해 무엇을 남길지 선택하세요.
+            firstSync: "이 기기의 첫 동기화: 클라우드에서 $1개, 업로드 $2개."
+            accountChanged: "현재 $1(으)로 로그인되어 있으며, 이 기기가 마지막으로 동기화한 계정과 다릅니다. 이 기기의 용어집 항목 $2개가 이 계정으로 업로드됩니다. 이 계정의 용어집만 쓰려면 취소하고, 이 기기의 용어집을 삭제한 뒤 다시 동기화하세요."
+            destructive: "이 동기화는 이 기기의 용어집 항목 $2개 중 $1개를 삭제합니다."
+            moreConflicts: "다른 $1 개의 차이는 목록에 없습니다. 모두 병합 결과를 따릅니다."
+            confirm: 동기화
+            cancel: 취소
       manualSync:
         title: 수동 설정 동기화
-        description: 수동으로 설정 가져오기 및 내보내기
+        description: 설정을 수동으로 가져오고 내보냅니다. 용어집도 함께 포함됩니다
         import: 가져오기
         export: 내보내기
         importSuccess: 설정 가져오기 완료
         exportSuccess: 설정 내보내기 완료
+        exportGlossaryFailed: 설정은 내보냈지만 용어집을 읽을 수 없어 파일에 포함되지 않았습니다.
         importError: 가져오기 실패
+        glossaryImported: "용어 $1개를 가져와 기존 용어집을 대체했습니다."
+        glossaryUndo: 실행 취소
+        glossaryUndone: 용어집을 가져오기 전 상태로 되돌렸습니다
+        glossaryUndoUnavailable: 실행 취소를 더 이상 사용할 수 없습니다 — 이후 용어집이 변경되었습니다.
+        glossaryMalformed: 그 파일의 용어집을 읽을 수 없습니다. 아무것도 변경하지 않았습니다.
+        glossaryVersionTooNew: 그 파일의 용어집은 더 새로운 버전의 Read Frog가 저장한 것입니다. 먼저 확장 프로그램을 업데이트하세요.
+        glossaryCapExceeded: "그 파일의 용어집 항목이 한도 $2개보다 $1개 많습니다. 아무것도 변경하지 않았습니다."
         exportOptions:
           title: 내보내기 옵션 선택
           description: 내보내는 설정에 API 키를 포함할지 선택하세요. API 키를 포함하면 민감한 정보가 유출될 수 있으므로 안전한 환경에서만 사용하는 것을 권장합니다.
@@ -455,13 +496,13 @@ options:
           confirm: 삭제
       reset:
         title: 기본 설정 복원
-        description: 모든 설정을 기본값으로 재설정
+        description: 모든 설정을 기본값으로 되돌립니다. 용어집은 영향을 받지 않습니다
         dialog:
           title: 기본 설정 복원
           trigger: 설정 초기화
           confirm: 확인
           cancel: 취소
-          description: 이 작업은 모든 사용자 지정 설정을 지우고 기본값으로 재설정합니다. 삭제하시겠습니까?
+          description: 이 작업은 모든 사용자 설정을 지우고 기본값으로 되돌립니다. 용어집은 유지됩니다 — 삭제하려면 용어집 페이지에서 진행하세요. 확인해 주세요.
     userExperience:
       title: 사용자 경험
       beta:
@@ -710,6 +751,115 @@ options:
         outputSchemaRequired: 최소 하나의 출력 필드를 추가하세요
         fieldKeyRequired: 필드 이름은 필수입니다
         duplicateFieldKey: 필드 이름은 고유해야 합니다
+  advanced:
+    title: 고급
+    pageDescription: 자주 쓰지는 않지만 강력한 설정입니다.
+    glossary:
+      title: 용어집
+      pageDescription: 중요한 단어에 고정된 번역을 지정하고, 각 목록이 적용될 곳을 선택하세요.
+      untitled: 제목 없는 용어집
+      noGlossaries: 아직 용어집이 없습니다.
+      enable:
+        title: 사용
+        description: 일치하는 용어를 LLM에 함께 전달해 원하는 표현으로 번역하게 합니다. 용어집은 프롬프트에 담겨 전달되므로, LLM 제공업체로 실행되는 기능에만 적용됩니다.
+      library:
+        title: 내 용어집
+        description: 용어집마다 고유한 용어와 웹사이트 목록이 있으므로, 업무용 용어 모음이 다른 모든 곳까지 따라오지 않습니다.
+        button: 용어집 추가
+        capReached: "용어집은 최대 $1개까지 만들 수 있습니다."
+        termUsage: "모든 용어집을 통틀어 $2개 용어 중 $1개 사용 중"
+      summary:
+        terms: "$1개 용어"
+        termsOne: 1개 용어
+        allSites: 모든 웹사이트
+        sites: "$1개 웹사이트"
+        sitesOne: 1개 웹사이트
+      editor:
+        docsLink: 어떻게 작동하나요?
+        sections:
+          terms: 용어
+          maintenance: 백업과 삭제
+        details:
+          title: 이름과 설명
+          descriptionPlaceholder: 설명 (선택 사항)
+        enable:
+          title: 사용
+          description: 사용하지 않는 용어집은 용어를 그대로 보관하지만 아무것도 전달하지 않습니다.
+        sites:
+          title: 웹사이트
+          description: 이 용어집을 특정 웹사이트에만 적용합니다. example.com은 그 주소만, *.example.com은 하위 도메인까지, example.com/docs/*는 사이트의 한 부분만 포함합니다.
+          allSites: 비워 두면 용어집이 모든 곳에 적용됩니다.
+          header: 웹사이트
+        delete:
+          title: 이 용어집 삭제
+          description: 용어집과 그 안의 모든 용어를 삭제합니다. 나중에 용어가 다시 필요할 수 있다면 먼저 내보내세요. 삭제는 되돌릴 수 없습니다.
+          dialog:
+            trigger: 삭제
+            title: 이 용어집을 삭제할까요?
+            description: "용어집과 그 안의 용어 $1개가 모두 영구히 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+            confirm: 삭제
+            cancel: 취소
+      addTerm:
+        title: 용어 추가
+        description: 용어에 원하는 번역을 지정하거나, 번역을 비워 두면 원문을 그대로 유지합니다.
+      list:
+        title: 내 용어
+        description: 문단에 나타난 용어만 해당 문단과 함께 전달됩니다.
+      importExport:
+        title: 가져오기와 내보내기
+        description: 용어는 source, target, targetLanguage, caseSensitive 네 개 열로 이루어진 CSV입니다. 내보내기가 만드는 형식과 같습니다.
+      sourcePlaceholder: 용어
+      targetPlaceholder: 번역 (비워 두면 원문 유지)
+      caseSensitive: 대소문자 구분
+      add: 추가
+      searchPlaceholder: 용어 검색
+      columnEnabled: 사용
+      columnSource: 용어
+      columnTarget: 번역
+      columnTargetLanguage: 대상 언어
+      allLanguages: 모든 언어
+      toggleTerm: "'$1' 사용"
+      editTerm: "'$1' 편집"
+      keepOriginal: 원문 유지
+      delete: 삭제
+      save: 저장
+      cancel: 취소
+      loading: 불러오는 중...
+      empty: 아직 용어가 없습니다. 위에서 추가하거나 CSV 파일을 가져오세요.
+      noMatches: 검색과 일치하는 용어가 없습니다.
+      previous: 이전
+      next: 다음
+      pageOf: "$1 / $2"
+      addError:
+        emptySource: 먼저 용어를 입력하세요.
+        tooLong: 용어가 너무 깁니다.
+        capReached: "모든 용어집을 통틀어 용어 수가 한도인 $1개에 도달했습니다."
+        duplicate: 이미 용어집에 있는 용어입니다.
+      import: 가져오기
+      export: 내보내기
+      importModeMerge: 목록에 추가
+      importModeReplace: 목록 교체
+      importEmpty: 해당 파일에서 용어를 찾을 수 없습니다.
+      importMissingHeader: "이 파일은 Read Frog 용어집 내보내기 파일이 아닙니다. 다음 열이 필요합니다:"
+      importOverflow: "이 가져오기는 한도를 $1개 초과합니다. 아무것도 변경되지 않았습니다."
+      importSuccess: "$1개를 새로 가져오고 $2개를 업데이트했습니다."
+      importSkipped: "잘못된 행 $1개와 중복 $2개를 건너뛰었습니다."
+      importNoValidRows: 해당 행을 하나도 가져올 수 없습니다. 변경된 내용이 없습니다.
+      importReplaceConfirm:
+        title: 목록 전체를 교체할까요?
+        description: "이 용어집의 $1개 용어가 모두 삭제되고(선택한 언어뿐 아니라 모든 대상 언어) 이 파일의 내용으로 교체됩니다. 이 작업은 되돌릴 수 없습니다."
+        confirm: 교체
+        cancel: 취소
+      deleteAll:
+        title: 모든 용어 삭제
+        description: 용어집을 비웁니다. 나중에 다시 필요할 수 있다면 먼저 내보내세요. 삭제는 되돌릴 수 없습니다.
+        deleting: 삭제하는 중...
+        dialog:
+          title: 모든 용어 삭제
+          trigger: 모두 삭제
+          confirm: 확인
+          cancel: 취소
+          description: "$1개의 용어가 모두 영구히 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
   contextMenu:
     title: 컨텍스트 메뉴
     pageDescription: 브라우저 우클릭 메뉴에 표시되는 Read Frog 항목을 설정하세요.

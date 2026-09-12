@@ -103,6 +103,7 @@ options:
     toggle: Yan paneli aç və ya bağla
     settings: Parametrlər
     features: Funksiyalar
+    translation: Tərcümə
     product: Məhsul
   tools:
     translationHub: Tərcümə mərkəzi
@@ -291,6 +292,7 @@ options:
     featureProviders:
       title: Funksiya provayderləri
       description: Hər funksiya üçün istifadə ediləcək provayderi seçin
+      chooseProvider: Provayder seç
       features:
         pageTranslation: Səhifə tərcüməsi
         selectionTranslation: Seçim alətlər panelində tərcümə
@@ -325,6 +327,8 @@ options:
       llmProviderNotConfigured: $1 üçün LLM provayderi seçilməyib
   patterns:
     duplicate: Bu şablon artıq siyahıdadır
+    gluedWildcard: '"*" ünvanın bütöv bir hissəsini əvəz etməlidir, məsələn *.example.com və ya example.*'
+    unsupported: Read Frog bu ünvanı uyğunlaşdıra bilmir. Portlar və http ilə https xaricindəki sxemlər dəstəklənmir.
   preference:
     title: Ümumi parametrlər
     pageDescription: Read Frog genişlənməsinin görünüşünü, harada işləyəcəyini, konfiqurasiyanın necə sinxronlaşdırılacağını və ehtiyat nüsxəsinin necə yaradılacağını təyin edin.
@@ -365,16 +369,17 @@ options:
       title: Konfiqurasiya
       googleDrive:
         title: Google Drive ilə bulud sinxronlaşdırması
-        description: Uzaqdakı konfiqurasiya daha yenidirsə endirir, yerli konfiqurasiya daha yenidirsə yükləyir
+        description: Uzaqdakı konfiqurasiya daha yenidirsə endirir, yerli konfiqurasiya daha yenidirsə yükləyir. Lüğətləriniz ayrıca faylda daşınır və bütövlükdə əvəz olunmaq yerinə termin-termin birləşdirilir.
         sync: Google Drive ilə sinxronlaşdır
         syncing: Sinxronlaşdırılır...
         syncSuccess:
           uploaded: Yerli konfiqurasiya buluda yükləndi
           downloaded: Uzaqdakı konfiqurasiya tətbiq edildi
-          sameChanges: Hər iki tərəfdə eyni dəyişikliklər var, sinxronlaşdırıldı
-          noChange: Artıq sinxronlaşdırılıb
-          unresolved: Ziddiyyətlər həll edildi və sinxronlaşdırıldı
-        syncError: Sinxronlaşdırma alınmadı, yenidən cəhd edin
+          sameChanges: Hər iki tərəfdə eyni parametr dəyişiklikləri, sinxronlaşdırıldı
+          noChange: Parametrlər artıq sinxrondur
+          unresolved: Parametr münaqişələri həll edildi və sinxronlaşdırıldı
+        syncError: Parametr sinxronizasiyası alınmadı, yenidən cəhd edin
+        accountChangedError: Dialoq açıq ikən daxil olunmuş Google hesabı dəyişdi. Heç nə yüklənmədi — yenidən sinxronlaşdırın.
         metadataCorrupted: Sinxronlaşdırma metaməlumatları zədələnib, uzaqdakı konfiqurasiya tətbiq edildi
         lastSyncTime: Son sinxronlaşdırma vaxtı
         logout: Çıxış et
@@ -410,14 +415,50 @@ options:
             title: Birləşdirilmiş konfiqurasiyada yoxlama xətaları var.
             description: "Düzəltmək üçün aşağıdakı fərqləri tənzimləyin:"
           moreErrors: ...və daha $1 xəta
+        glossary:
+          thisDevice: Bu cihaz
+          cloud: Bulud
+          deleted: Silinib
+          disabled: söndürülüb
+          upToDate: Lüğətlər artıq sinxrondur
+          uploaded: Lüğətlər buluda yükləndi
+          merged: "Lüğətlər sinxronlaşdırıldı: $1 əlavə, $2 yeniləndi, $3 silindi"
+          undo: Geri al
+          undone: Lüğətlər sinxronizasiyadan əvvəlki halına qaytarıldı
+          undoUnavailable: Bu geri alma artıq mümkün deyil — lüğətləriniz o vaxtdan bəri dəyişib.
+          retry: Sinxronizasiya zamanı lüğət dəyişdi. Yenidən işə salın.
+          accountChangedRetry: Dialoq açıq ikən daxil olunmuş Google hesabı dəyişdi. Heç nə yüklənmədi — yenidən sinxronlaşdırın.
+          busy: Başqa bir tab hazırda lüğətlərinizi sinxronlaşdırır.
+          malformed: Drive-dakı lüğət faylı oxuna bilmədi, ona görə heç nə dəyişmədi.
+          versionTooNew: Həmin lüğət faylını Read Frog-un daha yeni versiyası yazıb. Əvvəlcə genişlənməni yeniləyin.
+          duplicateFiles: Drive-ınızda birdən çox lüğət faylı var. Heç nə dəyişmədi - artıq olanı silin.
+          capExceeded: "Birləşdirmə lüğət limitini $1 aşardı. Heç nə dəyişmədi."
+          failed: Lüğət sinxronizasiyası alınmadı
+          review:
+            title: Bu lüğət sinxronizasiyasını nəzərdən keçirin
+            description: İki nüsxənin fərqləndiyi yerlərdə nəyin qalacağını seçin.
+            firstSync: "Bu cihazda ilk sinxronizasiya: buluddan $1, yuxarı $2."
+            accountChanged: "$1 hesabı ilə daxil olmusunuz — bu cihazın sonuncu dəfə sinxronlaşdırdığı hesab deyil. Cihazdakı $2 lüğət sətri bu hesaba yüklənəcək. Yalnız bu hesabın lüğətlərini istəyirsinizsə, ləğv edin, buradakıları silin və yenidən sinxronlaşdırın."
+            destructive: "Bu sinxronizasiya bu cihazdakı $2 lüğət sətrindən $1-ni silir."
+            moreConflicts: "Siyahıda olmayan daha $1 fərq var. Hər biri birləşmənin öz seçimini saxlayır."
+            confirm: Sinxronlaşdır
+            cancel: Ləğv et
       manualSync:
         title: Konfiqurasiyanın əl ilə sinxronlaşdırılması
-        description: Konfiqurasiya parametrlərini əl ilə idxal və ixrac edin
+        description: Ayarlarınızı əl ilə idxal və ixrac edin, lüğətləriniz də birlikdə gəlir
         import: İdxal et
         export: İxrac et
         importSuccess: Konfiqurasiya uğurla idxal edildi
         exportSuccess: Konfiqurasiya uğurla ixrac edildi
+        exportGlossaryFailed: Parametrləriniz ixrac edildi, lakin lüğətləriniz oxuna bilmədi və fayla daxil edilmədi.
         importError: İdxal alınmadı
+        glossaryImported: "$1 termin idxal edildi və əvvəlki lüğətləriniz əvəz olundu."
+        glossaryUndo: Geri al
+        glossaryUndone: Lüğətləriniz idxaldan əvvəlki halına qaytarıldı
+        glossaryUndoUnavailable: Bu geri alma artıq mümkün deyil — lüğətləriniz o vaxtdan bəri dəyişib.
+        glossaryMalformed: Həmin fayldakı lüğətlər oxuna bilmədi. Heç nə dəyişmədi.
+        glossaryVersionTooNew: Həmin fayldakı lüğətləri Read Frog-un daha yeni versiyası yazıb. Əvvəlcə genişlənməni yeniləyin.
+        glossaryCapExceeded: "Həmin faylda $2 limitindən $1 çox lüğət sətri var. Heç nə dəyişmədi."
         exportOptions:
           title: İxrac seçimlərini təyin edin
           description: İxrac edilən konfiqurasiyaya API açarlarının daxil edilib-edilməyəcəyini seçin. API açarlarının daxil edilməsi məxfi məlumatların sızmasına səbəb ola bilər, buna görə bunu yalnız təhlükəsiz mühitlərdə etmək tövsiyə olunur.
@@ -456,13 +497,13 @@ options:
           confirm: Sil
       reset:
         title: Konfiqurasiyanın sıfırlanması
-        description: Bütün konfiqurasiyanı standart dəyərlərə qaytarın
+        description: Bütün parametrləri ilkin dəyərlərə sıfırla. Lüğətlərinizə toxunulmur.
         dialog:
           title: Konfiqurasiyanın sıfırlanması
           trigger: Konfiqurasiyanı sıfırla
           confirm: Təsdiqlə
           cancel: Ləğv et
-          description: Bu əməliyyat bütün fərdi konfiqurasiyalarınızı siləcək və onları standart dəyərlərə qaytaracaq. Təsdiqləyin.
+          description: Bu əməliyyat bütün fərdi parametrlərinizi silib ilkin dəyərlərə qaytaracaq. Lüğətləriniz saxlanılır — silmək üçün lüğət səhifəsindən istifadə edin. Zəhmət olmasa təsdiqləyin.
     userExperience:
       title: İstifadəçi təcrübəsi
       beta:
@@ -826,6 +867,115 @@ options:
         outputSchemaRequired: Ən azı bir nəticə sahəsi əlavə edin
         fieldKeyRequired: Sahənin adı tələb olunur
         duplicateFieldKey: Sahə adları unikal olmalıdır
+  advanced:
+    title: Qabaqcıl
+    pageDescription: Gündəlik istifadə üçün olmayan güclü parametrlər.
+    glossary:
+      title: Terminlər lüğəti
+      pageDescription: Sizin üçün vacib olan sözlərə sabit tərcümə təyin edin və hər siyahının harada tətbiq olunacağını seçin.
+      untitled: Adsız lüğət
+      noGlossaries: Hələ lüğət yoxdur.
+      enable:
+        title: Aktiv et
+        description: Uyğun gələn terminləri LLM-ə göndərir ki, onları istədiyiniz kimi tərcümə etsin. Lüğət sorğunun içində göndərilir, ona görə də yalnız LLM provayderi üzərində işləyən funksiyalara tətbiq olunur.
+      library:
+        title: Lüğətləriniz
+        description: Hər lüğətin öz terminləri və öz sayt siyahısı var, ona görə də iş üçün nəzərdə tutulmuş terminlər dəsti sizinlə birlikdə hər yerə keçmir.
+        button: Lüğət əlavə et
+        capReached: "Ən çoxu $1 lüğətiniz ola bilər."
+        termUsage: "Bütün lüğətlər üzrə $2 termindən $1 istifadə olunub"
+      summary:
+        terms: "$1 termin"
+        termsOne: 1 termin
+        allSites: Bütün saytlar
+        sites: "$1 sayt"
+        sitesOne: 1 sayt
+      editor:
+        docsLink: Necə işləyir?
+        sections:
+          terms: Terminlər
+          maintenance: Ehtiyat nüsxə və silmə
+        details:
+          title: Ad və təsvir
+          descriptionPlaceholder: Təsvir (istəyə bağlı)
+        enable:
+          title: Aktiv et
+          description: Deaktiv lüğət terminlərini saxlayır, lakin onlardan heç birini göndərmir.
+        sites:
+          title: Saytlar
+          description: Bu lüğəti yalnız müəyyən saytlarla məhdudlaşdırın. example.com yalnız həmin ünvandır; *.example.com alt domenləri əlavə edir; example.com/docs/* saytın bir hissəsinə daraldır.
+          allSites: Bunu boş buraxsanız, lüğət hər yerdə tətbiq olunur.
+          header: Sayt
+        delete:
+          title: Bu lüğəti sil
+          description: Lüğəti və içindəki bütün terminləri silir. Terminlər sonra lazım ola bilərsə, əvvəlcə ixrac edin — bunu geri qaytarmaq mümkün deyil.
+          dialog:
+            trigger: Sil
+            title: Bu lüğət silinsin?
+            description: "Lüğət və içindəki bütün $1 termin həmişəlik silinəcək. Bu əməliyyatı geri qaytarmaq mümkün deyil."
+            confirm: Sil
+            cancel: Ləğv et
+      addTerm:
+        title: Termin əlavə et
+        description: Termin üçün istədiyiniz tərcüməni yazın və ya orijinalı saxlamaq üçün tərcüməni boş buraxın.
+      list:
+        title: Terminləriniz
+        description: Yalnız abzasda rast gəlinən terminlər onunla birlikdə göndərilir.
+      importExport:
+        title: İdxal və ixrac
+        description: Terminlər source, target, targetLanguage və caseSensitive sütunlarından ibarət CSV faylıdır — İxrac məhz bunu yazır.
+      sourcePlaceholder: Termin
+      targetPlaceholder: Tərcümə (orijinalı saxlamaq üçün boş buraxın)
+      caseSensitive: Hərf registrini nəzərə al
+      add: Əlavə et
+      searchPlaceholder: Terminləri axtar
+      columnEnabled: Aktiv
+      columnSource: Termin
+      columnTarget: Tərcümə
+      columnTargetLanguage: Hədəf dili
+      allLanguages: Bütün dillər
+      toggleTerm: "$1 terminini istifadə et"
+      editTerm: "$1 terminini redaktə et"
+      keepOriginal: Orijinalı saxla
+      delete: Sil
+      save: Yadda saxla
+      cancel: Ləğv et
+      loading: Yüklənir...
+      empty: Hələ termin yoxdur. Yuxarıdan əlavə edin və ya CSV faylı idxal edin.
+      noMatches: Axtarışınıza uyğun termin yoxdur.
+      previous: Əvvəlki
+      next: Növbəti
+      pageOf: "$1 / $2"
+      addError:
+        emptySource: Əvvəlcə termin daxil edin.
+        tooLong: Bu termin çox uzundur.
+        capReached: "Bütün lüğətləriniz birlikdə $1 terminlik limitə çatıb."
+        duplicate: Bu termin artıq lüğətinizdədir.
+      import: İdxal et
+      export: İxrac et
+      importModeMerge: Siyahıya əlavə et
+      importModeReplace: Siyahını əvəz et
+      importEmpty: Bu faylda termin tapılmadı.
+      importMissingHeader: "Bu fayl Read Frog lüğət ixracı deyil. Bu sütunlar tələb olunur:"
+      importOverflow: "Bu idxal limiti $1 termin aşacaq. Heç nə dəyişdirilmədi."
+      importSuccess: "$1 yeni termin idxal edildi, $2 termin yeniləndi."
+      importSkipped: "$1 yanlış sətir və $2 təkrar buraxıldı."
+      importNoValidRows: Bu sətirlərin heç biri idxal edilə bilmədi. Heç nə dəyişdirilmədi.
+      importReplaceConfirm:
+        title: Bütün siyahı əvəz edilsin?
+        description: "Bu lüğətdəki $1 terminin hamısı silinəcək — yalnız seçilmiş dil deyil, bütün hədəf dillər — və bu faylın məzmunu ilə əvəz olunacaq. Bu əməliyyat geri qaytarıla bilməz."
+        confirm: Əvəz et
+        cancel: Ləğv et
+      deleteAll:
+        title: Bütün terminləri sil
+        description: Terminlər lüğətinizi boşaldır. Terminlər sonra lazım ola bilərsə, əvvəlcə ixrac edin — silmə geri qaytarıla bilməz.
+        deleting: Silinir...
+        dialog:
+          title: Bütün terminləri sil
+          trigger: Hamısını sil
+          confirm: Təsdiqlə
+          cancel: Ləğv et
+          description: "Bütün $1 termin həmişəlik silinəcək. Bu əməliyyatı geri qaytarmaq mümkün deyil."
   contextMenu:
     title: Kontekst menyusu
     pageDescription: Brauzerin sağ klik menyusundakı Read Frog elementlərini idarə edin.
