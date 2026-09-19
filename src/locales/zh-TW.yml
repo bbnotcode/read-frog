@@ -7,6 +7,9 @@ account:
   webApp: 網頁應用程式
   logout: 退出登入
   logoutError: 退出登入失敗，請重試
+  grantAccess: 授予存取權限
+  grantAccessHint: 需要存取 readfrog.app
+  grantAccessError: 授予存取權限失敗，請重試
 dataTypes:
   string: 文字
   number: 數字
@@ -742,6 +745,7 @@ options:
           paragraphs: 與選取範圍相交的段落內容，會以空行串接，傳給自訂 AI 指令時會截斷到前 2000 個字元
           targetLanguage: 使用者的目標語言
           webTitle: 網頁標題
+          webUrl: 目前網頁的完整 URL
           webContent: 從目前頁面擷取的網頁內文（截斷到前 2000 個字元）
         delete: 刪除
         deleteDialog:

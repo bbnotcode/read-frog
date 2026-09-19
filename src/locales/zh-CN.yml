@@ -7,6 +7,9 @@ account:
   webApp: 网页应用
   logout: 退出登录
   logoutError: 退出登录失败，请重试
+  grantAccess: 授予访问权限
+  grantAccessHint: 需要访问 readfrog.app
+  grantAccessError: 授予访问权限失败，请重试
 dataTypes:
   string: 文本
   number: 数字
@@ -742,6 +745,7 @@ options:
           paragraphs: 与选区相交的段落内容，会以空行拼接，传给自定义 AI 指令时会截断到前 2000 个字符
           targetLanguage: 用户的目标语言
           webTitle: 网页标题
+          webUrl: 当前网页的完整 URL
           webContent: 当前网页提取出的正文内容（截断到前 2000 个字符）
         delete: 删除
         deleteDialog:

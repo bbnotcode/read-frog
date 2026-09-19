@@ -7,6 +7,9 @@ account:
   webApp: ウェブアプリ
   logout: ログアウト
   logoutError: ログアウトに失敗しました。もう一度お試しください。
+  grantAccess: アクセスを許可
+  grantAccessHint: readfrog.app へのアクセスが必要です
+  grantAccessError: アクセスの許可に失敗しました。もう一度お試しください。
 dataTypes:
   string: テキスト
   number: 数値
@@ -741,6 +744,7 @@ options:
           paragraphs: 選択範囲と交差する段落内容。空行で連結され、カスタム AI アクションに送信する際は先頭 2000 文字に切り詰められます
           targetLanguage: ユーザーのターゲット言語
           webTitle: ウェブページのタイトル
+          webUrl: 現在のページの完全な URL
           webContent: 現在のページから抽出されたウェブページ本文（先頭 2000 文字に切り詰め）
         delete: 削除
         deleteDialog:

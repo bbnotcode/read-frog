@@ -7,6 +7,9 @@ account:
   webApp: Aplicación web
   logout: Cerrar sesión
   logoutError: No se pudo cerrar sesión. Inténtalo de nuevo.
+  grantAccess: Conceder acceso
+  grantAccessHint: Necesita acceso a readfrog.app
+  grantAccessError: No se pudo conceder el acceso. Inténtalo de nuevo.
 dataTypes:
   string: Texto
   number: Número
@@ -742,6 +745,7 @@ options:
           paragraphs: Texto de párrafos intersectados unido con líneas en blanco, truncado a los primeros 2000 caracteres cuando se envía a acciones AI personalizadas
           targetLanguage: Idioma de destino del usuario
           webTitle: Título de la página web
+          webUrl: URL completa de la página actual
           webContent: Contenido de la página web extraído de la página actual, truncado a los primeros 2000 caracteres
         delete: Eliminar
         deleteDialog:

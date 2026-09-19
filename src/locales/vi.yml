@@ -7,6 +7,9 @@ account:
   webApp: Ứng dụng web
   logout: Đăng xuất
   logoutError: Đăng xuất thất bại. Vui lòng thử lại.
+  grantAccess: Cấp quyền truy cập
+  grantAccessHint: Cần quyền truy cập readfrog.app
+  grantAccessError: Không thể cấp quyền truy cập. Vui lòng thử lại.
 dataTypes:
   string: Văn bản
   number: Số
@@ -741,6 +744,7 @@ options:
           paragraphs: Nội dung các đoạn giao với vùng chọn, được nối bằng dòng trống, sẽ bị cắt còn 2000 ký tự đầu khi gửi vào hành động AI tùy chỉnh
           targetLanguage: Ngôn ngữ đích của người dùng
           webTitle: Tiêu đề trang web
+          webUrl: URL đầy đủ của trang hiện tại
           webContent: Nội dung trang web được trích xuất từ trang hiện tại (bị cắt còn 2000 ký tự đầu)
         delete: Xóa
         deleteDialog:
