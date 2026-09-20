@@ -84,6 +84,7 @@ describe("migrateVocabularyHunterState", () => {
     expect(migrated.activeWordbook).toBe(DEFAULT_VOCABULARY_WORDBOOK)
     expect(migrated.wordbooks[DEFAULT_VOCABULARY_WORDBOOK]).toEqual(["missing"])
     expect(migrated.wordbookAddedAt[DEFAULT_VOCABULARY_WORDBOOK]).toEqual({ missing: 0 })
+    expect(migrated.vocabularyAssessment).toBeNull()
   })
 
   it("repairs unsupported dictionary configuration", () => {

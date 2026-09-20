@@ -1,9 +1,10 @@
+import type { VocabularyAssessment } from "./assessment"
 import type { VocabularyLevel, VocabularyStatus } from "./candidates"
 import { storage } from "#imports"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
 const VOCABULARY_HUNTER_SECRET_KEY = "local:vocabulary-hunter-secret"
-export const VOCABULARY_HUNTER_SCHEMA_VERSION = 5
+export const VOCABULARY_HUNTER_SCHEMA_VERSION = 6
 export const DEFAULT_VOCABULARY_WORDBOOK = "托福生词"
 export type VocabularyDictionary = "haici" | "google" | "ai"
 const SUPPORTED_DICTIONARIES: VocabularyDictionary[] = ["haici", "google", "ai"]
@@ -23,6 +24,7 @@ export interface VocabularyHunterState {
   gistLastSyncCount: number
   gistSyncError: string
   activeWordbook: string
+  vocabularyAssessment: VocabularyAssessment | null
   wordbooks: Record<string, string[]>
   wordbookAddedAt: Record<string, Record<string, number>>
   statuses: Record<string, VocabularyStatus>
@@ -42,6 +44,7 @@ export type VocabularyHunterPreferences = Pick<
   | "gistId"
   | "gistAutoSync"
   | "activeWordbook"
+  | "vocabularyAssessment"
 >
 
 export type VocabularyHunterPreferencePatch = Partial<VocabularyHunterPreferences>
@@ -61,6 +64,7 @@ export const DEFAULT_VOCABULARY_HUNTER_STATE: VocabularyHunterState = {
   gistLastSyncCount: 0,
   gistSyncError: "",
   activeWordbook: DEFAULT_VOCABULARY_WORDBOOK,
+  vocabularyAssessment: null,
   wordbooks: { [DEFAULT_VOCABULARY_WORDBOOK]: [] },
   wordbookAddedAt: { [DEFAULT_VOCABULARY_WORDBOOK]: {} },
   statuses: {},
@@ -222,6 +226,18 @@ export function migrateVocabularyHunterState(
     requestedWordbook && wordbooks[requestedWordbook]
       ? requestedWordbook
       : DEFAULT_VOCABULARY_WORDBOOK
+  const savedAssessment = state.vocabularyAssessment
+  const vocabularyAssessment =
+    savedAssessment?.version === 1 &&
+    Number.isFinite(savedAssessment.testedAt) &&
+    Number.isFinite(savedAssessment.sampleSize) &&
+    Number.isFinite(savedAssessment.confidence) &&
+    Number.isFinite(savedAssessment.falsePositiveRate) &&
+    ["p", "m", "h", "4", "6", "g", "o"].every((level) =>
+      Number.isFinite(savedAssessment.probabilities?.[level as VocabularyLevel]),
+    )
+      ? savedAssessment
+      : null
 
   return {
     ...DEFAULT_VOCABULARY_HUNTER_STATE,
@@ -233,6 +249,7 @@ export function migrateVocabularyHunterState(
         : enabledDictionaries,
     dictionaryOrder,
     activeWordbook,
+    vocabularyAssessment,
     wordbooks,
     wordbookAddedAt,
     statuses,

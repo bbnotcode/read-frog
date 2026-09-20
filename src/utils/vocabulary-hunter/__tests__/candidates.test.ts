@@ -102,4 +102,40 @@ describe("vocabulary hunter candidates", () => {
       ),
     ).toEqual(["likely"])
   })
+
+  it("uses assessment results only when there is no explicit learning status", () => {
+    const dictionary = new Map([
+      ["require", { lemma: "require", level: "h" as const, index: 1 }],
+      ["reluctant", { lemma: "reluctant", level: "4" as const, index: 2 }],
+    ])
+    const assessment = {
+      version: 1 as const,
+      probabilities: { p: 0.99, m: 0.95, h: 0.9, "4": 0.7, "6": 0.3, g: 0.1, o: 0.05 },
+      confidence: 0.9,
+      testedAt: 1,
+      sampleSize: 34,
+      falsePositiveRate: 0,
+    }
+
+    expect(
+      findCandidateWords(
+        "Require reluctant",
+        2,
+        { require: "unknown" },
+        dictionary,
+        new Set(["h", "4"] as const),
+        assessment,
+      ).map(({ word }) => word),
+    ).toEqual(["require", "reluctant"])
+    expect(
+      findCandidateWords(
+        "Require reluctant",
+        2,
+        {},
+        dictionary,
+        new Set(["h", "4"] as const),
+        assessment,
+      ).map(({ word }) => word),
+    ).toEqual(["reluctant"])
+  })
 })

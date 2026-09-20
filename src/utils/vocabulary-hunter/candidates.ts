@@ -1,3 +1,6 @@
+import type { VocabularyAssessment } from "./assessment"
+import { shouldHideAssessedWord } from "./assessment"
+
 export type VocabularyStatus = "known" | "fuzzy" | "unknown"
 export type VocabularyLevel = "p" | "m" | "h" | "4" | "6" | "g" | "o"
 
@@ -277,6 +280,7 @@ export function findCandidateWords(
   statuses: Record<string, VocabularyStatus>,
   dictionary?: Map<string, VocabularyWordInfo>,
   enabledLevels?: ReadonlySet<VocabularyLevel>,
+  assessment: VocabularyAssessment | null = null,
 ) {
   const occurrences: WordOccurrence[] = []
 
@@ -301,6 +305,7 @@ export function findCandidateWords(
         (word.length < minimumLength ||
           (!dictionary && BASIC_WORDS.has(word)) ||
           (effectiveLevel && enabledLevels && !enabledLevels.has(effectiveLevel)) ||
+          shouldHideAssessedWord(assessment, effectiveLevel) ||
           (dictionary && !wordInfo)))
     ) {
       continue

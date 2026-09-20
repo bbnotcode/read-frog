@@ -70,6 +70,28 @@ function sanitizePreferencePatch(patch: VocabularyHunterPreferencePatch) {
     const name = normalizeVocabularyWordbookName(patch.activeWordbook)
     if (name) safe.activeWordbook = name
   }
+  if (patch.vocabularyAssessment === null) safe.vocabularyAssessment = null
+  else if (patch.vocabularyAssessment?.version === 1) {
+    const assessment = patch.vocabularyAssessment
+    if (
+      Number.isFinite(assessment.testedAt) &&
+      Number.isFinite(assessment.sampleSize) &&
+      assessment.sampleSize >= 1 &&
+      assessment.sampleSize <= 100 &&
+      Number.isFinite(assessment.confidence) &&
+      assessment.confidence >= 0 &&
+      assessment.confidence <= 1 &&
+      Number.isFinite(assessment.falsePositiveRate) &&
+      assessment.falsePositiveRate >= 0 &&
+      assessment.falsePositiveRate <= 1 &&
+      [...LEVELS].every((level) => {
+        const value = assessment.probabilities[level as keyof typeof assessment.probabilities]
+        return Number.isFinite(value) && value >= 0 && value <= 1
+      })
+    ) {
+      safe.vocabularyAssessment = assessment
+    }
+  }
   return safe
 }
 

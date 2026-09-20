@@ -9,6 +9,14 @@ import { Input } from "@/components/ui/base-ui/input"
 import { Switch } from "@/components/ui/base-ui/switch"
 import { sendMessage } from "@/utils/message"
 import {
+  ASSESSMENT_LEVELS,
+  createVocabularyAssessmentItems,
+  scoreVocabularyAssessment,
+  type VocabularyAssessmentAnswer,
+  type VocabularyAssessmentItem,
+  type VocabularyAssessmentResponse,
+} from "@/utils/vocabulary-hunter/assessment"
+import {
   getVocabularyLevel,
   loadVocabularyDictionary,
   VOCABULARY_LEVELS,
@@ -219,6 +227,8 @@ export function VocabularyHunterPage() {
   const [newWordbookName, setNewWordbookName] = useState("")
   const [wordbookMessage, setWordbookMessage] = useState("")
   const [wordbookExportDate, setWordbookExportDate] = useState(todayForDateInput)
+  const [assessmentItems, setAssessmentItems] = useState<VocabularyAssessmentItem[]>([])
+  const [assessmentAnswers, setAssessmentAnswers] = useState<VocabularyAssessmentAnswer[]>([])
   const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -263,6 +273,9 @@ export function VocabularyHunterPage() {
     if (next.gistId !== state.gistId) patch.gistId = next.gistId
     if (next.gistAutoSync !== state.gistAutoSync) patch.gistAutoSync = next.gistAutoSync
     if (next.activeWordbook !== state.activeWordbook) patch.activeWordbook = next.activeWordbook
+    if (next.vocabularyAssessment !== state.vocabularyAssessment) {
+      patch.vocabularyAssessment = next.vocabularyAssessment
+    }
     setState(next)
     if (Object.keys(patch).length > 0) void sendMessage("patchVocabularyPreferences", patch)
   }
@@ -502,6 +515,23 @@ export function VocabularyHunterPage() {
     setWordbookMessage(`已导出 ${exportedWords.length} 个单词，每行一个`)
   }
 
+  const startVocabularyAssessment = () => {
+    setAssessmentItems(createVocabularyAssessmentItems(dictionary))
+    setAssessmentAnswers([])
+  }
+
+  const answerVocabularyAssessment = (response: VocabularyAssessmentResponse) => {
+    const item = assessmentItems[assessmentAnswers.length]
+    if (!item) return
+    const nextAnswers = [...assessmentAnswers, { ...item, response }]
+    setAssessmentAnswers(nextAnswers)
+    if (nextAnswers.length !== assessmentItems.length) return
+    const vocabularyAssessment = scoreVocabularyAssessment(nextAnswers)
+    updateState({ ...state, vocabularyAssessment })
+    setAssessmentItems([])
+    setAssessmentAnswers([])
+  }
+
   return (
     <PageLayout
       title="生词猎手"
@@ -597,6 +627,119 @@ export function VocabularyHunterPage() {
               将它重新加入未掌握。快捷键会直接显示在悬浮卡按钮中；输入框和编辑区域内不会触发。
             </p>
           </div>
+        </div>
+      </ConfigCard>
+
+      <ConfigCard
+        layout="stacked"
+        title="本地词汇量评估"
+        description="用内置词库估计你在各难度层级的掌握率，并减少明显已掌握词的标注。"
+      >
+        <div className="flex flex-col gap-4 rounded-xl border p-5">
+          {assessmentItems.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span aria-live="polite">
+                  第 {assessmentAnswers.length + 1} / {assessmentItems.length} 题
+                </span>
+                <span className="text-muted-foreground">请按真实理解作答，不凭词形猜测</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={assessmentItems.length}
+                aria-valuenow={assessmentAnswers.length}
+                className="h-2 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{ width: `${(assessmentAnswers.length / assessmentItems.length) * 100}%` }}
+                />
+              </div>
+              <div className="rounded-xl bg-muted/50 px-5 py-8 text-center">
+                <div className="text-3xl font-semibold tracking-wide">
+                  {assessmentItems[assessmentAnswers.length]?.word}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  你能否不看词典，说出这个词的大致意思？
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button className="min-h-12" onClick={() => answerVocabularyAssessment("known")}>
+                  认识，能说出意思
+                </Button>
+                <Button
+                  className="min-h-12"
+                  variant="outline"
+                  onClick={() => answerVocabularyAssessment("unsure")}
+                >
+                  眼熟 / 不确定
+                </Button>
+                <Button
+                  className="min-h-12"
+                  variant="outline"
+                  onClick={() => answerVocabularyAssessment("unknown")}
+                >
+                  不认识
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setAssessmentItems([])
+                  setAssessmentAnswers([])
+                }}
+              >
+                暂停测试
+              </Button>
+            </>
+          ) : (
+            <>
+              {state.vocabularyAssessment ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {ASSESSMENT_LEVELS.map((level) => {
+                    const levelInfo = getVocabularyLevel(level)
+                    const probability = state.vocabularyAssessment!.probabilities[level]
+                    return (
+                      <div key={level} className="rounded-xl bg-muted/50 p-3">
+                        <div className="text-xs text-muted-foreground">{levelInfo.label}</div>
+                        <div className="mt-1 text-xl font-semibold">
+                          {Math.round(probability * 100)}%
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">
+                  尚未评估。测试约 34 题，包含少量看起来像英文的伪词，用来校正误认和猜测。
+                </div>
+              )}
+              {state.vocabularyAssessment && (
+                <p className="text-sm text-muted-foreground">
+                  置信度 {Math.round(state.vocabularyAssessment.confidence * 100)}%，误认校正率
+                  {Math.round(state.vocabularyAssessment.falsePositiveRate * 100)}
+                  %。只保存这组汇总结果，不保存逐题答案。
+                </p>
+              )}
+              <div className="flex flex-wrap gap-3">
+                <Button disabled={dictionary.size === 0} onClick={startVocabularyAssessment}>
+                  {state.vocabularyAssessment ? "重新测试" : "开始测试"}
+                </Button>
+                {state.vocabularyAssessment && (
+                  <Button
+                    variant="outline"
+                    onClick={() => updateState({ ...state, vocabularyAssessment: null })}
+                  >
+                    清除评估
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                自动过滤仅作用于未手动判断的词；你按 A、S、D 设置的状态始终优先。
+              </p>
+            </>
+          )}
         </div>
       </ConfigCard>
 

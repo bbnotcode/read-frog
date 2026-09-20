@@ -684,6 +684,7 @@ async function start(ctx: ContentScriptContext) {
       state.statuses,
       vocabularyDictionary,
       enabledLevels,
+      state.vocabularyAssessment,
     )) {
       if (trackedRanges.length >= MAX_RANGES) break
       const explicitStatus = state.statuses[occurrence.word]
