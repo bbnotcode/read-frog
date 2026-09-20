@@ -77,6 +77,23 @@ describe("vocabulary assessment", () => {
     expect(estimateVocabularySize(dictionary, probabilities)).toBe(100)
   })
 
+  it("replaces model probabilities with explicit vocabulary judgements", () => {
+    const dictionary = new Map(
+      Array.from(
+        { length: 100 },
+        (_, index) =>
+          [`word-${index}`, { lemma: `word-${index}`, level: "p" as const, index }] as const,
+      ),
+    )
+    const probabilities = { p: 0.5, m: 0, h: 0, "4": 0, "6": 0, g: 0, o: 0 }
+    const statuses = Object.fromEntries(
+      Array.from({ length: 10 }, (_, index) => [`word-${index}`, "known" as const]),
+    )
+
+    expect(estimateVocabularySize(dictionary, probabilities)).toBe(50)
+    expect(estimateVocabularySize(dictionary, probabilities, statuses)).toBe(55)
+  })
+
   it("does not repeat words from earlier assessment rounds", () => {
     const dictionary = new Map(
       ASSESSMENT_LEVELS.flatMap((level, levelIndex) =>

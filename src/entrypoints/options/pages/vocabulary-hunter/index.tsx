@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/base-ui/switch"
 import { sendMessage } from "@/utils/message"
 import {
   ASSESSMENT_LEVELS,
+  countExplicitVocabularyStatuses,
   createVocabularyAssessmentItems,
   estimateVocabularyRange,
   estimateVocabularySize,
@@ -33,6 +34,7 @@ import {
   getVocabularyHunterState,
   setVocabularyHunterGistToken,
   type VocabularyHunterState,
+  watchVocabularyHunterState,
 } from "@/utils/vocabulary-hunter/storage"
 import {
   fetchWordHunterGist,
@@ -257,6 +259,8 @@ export function VocabularyHunterPage() {
     })
   }, [])
 
+  useEffect(() => watchVocabularyHunterState(setState), [])
+
   const updateState = (next: VocabularyHunterState) => {
     const patch: VocabularyHunterPreferencePatch = {}
     if (next.enabled !== state.enabled) patch.enabled = next.enabled
@@ -314,16 +318,28 @@ export function VocabularyHunterPage() {
   ])
   const vocabularyEstimate = useMemo(() => {
     if (!state.vocabularyAssessment || dictionary.size === 0) return null
-    const current = estimateVocabularySize(dictionary, state.vocabularyAssessment.probabilities)
+    const current = estimateVocabularySize(
+      dictionary,
+      state.vocabularyAssessment.probabilities,
+      state.statuses,
+    )
     const previous = state.vocabularyAssessment.previousProbabilities
-      ? estimateVocabularySize(dictionary, state.vocabularyAssessment.previousProbabilities)
+      ? estimateVocabularySize(
+          dictionary,
+          state.vocabularyAssessment.previousProbabilities,
+          state.statuses,
+        )
       : null
     return {
       current,
       previous,
       range: estimateVocabularyRange(current, state.vocabularyAssessment.confidence),
     }
-  }, [dictionary, state.vocabularyAssessment])
+  }, [dictionary, state.statuses, state.vocabularyAssessment])
+  const explicitVocabularyCounts = useMemo(
+    () => countExplicitVocabularyStatuses(dictionary, state.statuses),
+    [dictionary, state.statuses],
+  )
   const pageCount = Math.max(1, Math.ceil(words.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const pagedWords = useMemo(
@@ -737,6 +753,12 @@ export function VocabularyHunterPage() {
                             ).toLocaleString()}
                           </span>
                         )}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                        已明确标记掌握 {explicitVocabularyCounts.known.toLocaleString()}
+                        词、待巩固 {explicitVocabularyCounts.fuzzy.toLocaleString()}
+                        词、未掌握 {explicitVocabularyCounts.unknown.toLocaleString()}
+                        词；修改标记后会实时重算。
                       </div>
                     </div>
                   )}

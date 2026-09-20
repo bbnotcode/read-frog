@@ -1,4 +1,4 @@
-import type { VocabularyLevel, VocabularyWordInfo } from "./candidates"
+import type { VocabularyLevel, VocabularyStatus, VocabularyWordInfo } from "./candidates"
 
 export const ASSESSMENT_LEVELS: VocabularyLevel[] = ["p", "m", "h", "4", "6", "g", "o"]
 
@@ -231,11 +231,31 @@ export function scoreVocabularyAssessment(
 export function estimateVocabularySize(
   dictionary: Map<string, VocabularyWordInfo>,
   probabilities: Record<VocabularyLevel, number>,
+  statuses: Record<string, VocabularyStatus> = {},
 ) {
-  const lemmaLevels = new Map<number, VocabularyLevel>()
-  dictionary.forEach((info) => lemmaLevels.set(info.index, info.level))
-  const estimate = [...lemmaLevels.values()].reduce((sum, level) => sum + probabilities[level], 0)
-  return Math.round(estimate / 100) * 100
+  const lemmas = new Map<number, { lemma: string; level: VocabularyLevel }>()
+  dictionary.forEach((info) => lemmas.set(info.index, { lemma: info.lemma, level: info.level }))
+  const statusScore: Record<VocabularyStatus, number> = { known: 1, fuzzy: 0.5, unknown: 0 }
+  const estimate = [...lemmas.values()].reduce((sum, { lemma, level }) => {
+    const status = statuses[lemma]
+    return sum + (status === undefined ? probabilities[level] : statusScore[status])
+  }, 0)
+  return Math.round(estimate)
+}
+
+export function countExplicitVocabularyStatuses(
+  dictionary: Map<string, VocabularyWordInfo>,
+  statuses: Record<string, VocabularyStatus>,
+) {
+  const counts: Record<VocabularyStatus, number> = { known: 0, fuzzy: 0, unknown: 0 }
+  const seen = new Set<number>()
+  dictionary.forEach((info) => {
+    if (seen.has(info.index)) return
+    seen.add(info.index)
+    const status = statuses[info.lemma]
+    if (status) counts[status] += 1
+  })
+  return counts
 }
 
 export function estimateVocabularyRange(estimate: number, confidence: number) {
