@@ -36,6 +36,7 @@ import {
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
 const MAX_RANGES = 1200
+const MAX_SYNCHRONOUS_MUTATION_NODES = 40
 const INVALID_ANCESTOR_SELECTOR = `canvas,code,kbd,noscript,pre,script,style,svg,${VOCABULARY_INTERACTIVE_SELECTOR}`
 const INVALID_TAGS = new Set([
   "BUTTON",
@@ -1086,8 +1087,12 @@ async function start(ctx: ContentScriptContext) {
       mutation.addedNodes.forEach(queueTextNodes)
       if (mutation.removedNodes.length) shouldCleanDisconnectedRanges = true
     }
-    if (shouldCleanDisconnectedRanges) removeDisconnectedRanges()
-    if (pendingTextNodes.size) schedulePendingTextNodes()
+    if (pendingTextNodes.size > 0 && pendingTextNodes.size <= MAX_SYNCHRONOUS_MUTATION_NODES) {
+      void processPendingTextNodes()
+    } else {
+      if (shouldCleanDisconnectedRanges) removeDisconnectedRanges()
+      if (pendingTextNodes.size) schedulePendingTextNodes()
+    }
   })
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 
