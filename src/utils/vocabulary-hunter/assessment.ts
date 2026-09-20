@@ -238,9 +238,11 @@ export function estimateVocabularySize(
   const statusScore: Record<VocabularyStatus, number> = { known: 1, fuzzy: 0.5, unknown: 0 }
   const estimate = [...lemmas.values()].reduce((sum, { lemma, level }) => {
     const status = statuses[lemma]
-    return sum + (status === undefined ? probabilities[level] : statusScore[status])
+    const probability = Number.isFinite(probabilities[level]) ? probabilities[level] : 0
+    const explicitScore = status === undefined ? undefined : statusScore[status]
+    return sum + (Number.isFinite(explicitScore) ? explicitScore! : probability)
   }, 0)
-  return Math.round(estimate)
+  return Number.isFinite(estimate) ? Math.round(estimate) : 0
 }
 
 export function countExplicitVocabularyStatuses(
@@ -253,15 +255,20 @@ export function countExplicitVocabularyStatuses(
     if (seen.has(info.index)) return
     seen.add(info.index)
     const status = statuses[info.lemma]
-    if (status) counts[status] += 1
+    if (status && Number.isFinite(counts[status])) counts[status] += 1
   })
   return counts
 }
 
 export function estimateVocabularyRange(estimate: number, confidence: number) {
-  const margin = Math.max(0.1, (1 - confidence) * 0.45)
+  const safeEstimate = Number.isFinite(estimate) ? Math.max(0, estimate) : 0
+  const safeConfidence = Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0
+  const margin = Math.max(0.1, (1 - safeConfidence) * 0.45)
   const round = (value: number) => Math.max(0, Math.round(value / 500) * 500)
-  return { low: round(estimate * (1 - margin)), high: round(estimate * (1 + margin)) }
+  return {
+    low: round(safeEstimate * (1 - margin)),
+    high: round(safeEstimate * (1 + margin)),
+  }
 }
 
 export function shouldHideAssessedWord(

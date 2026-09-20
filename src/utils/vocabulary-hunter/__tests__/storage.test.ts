@@ -97,4 +97,12 @@ describe("migrateVocabularyHunterState", () => {
     expect(migrated.enabledDictionaries).toEqual(["haici"])
     expect(migrated.dictionaryOrder).toEqual(["google", "haici", "ai"])
   })
+
+  it("drops malformed legacy word statuses instead of poisoning estimates", () => {
+    const migrated = migrateVocabularyHunterState({
+      statuses: { Valid: "known", broken: "mastered", "not a word": "unknown" },
+    })
+
+    expect(migrated.statuses).toEqual({ valid: "known" })
+  })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   ASSESSMENT_LEVELS,
   createVocabularyAssessmentItems,
+  estimateVocabularyRange,
   estimateVocabularySize,
   scoreVocabularyAssessment,
   type VocabularyAssessmentAnswer,
@@ -92,6 +93,18 @@ describe("vocabulary assessment", () => {
 
     expect(estimateVocabularySize(dictionary, probabilities)).toBe(50)
     expect(estimateVocabularySize(dictionary, probabilities, statuses)).toBe(55)
+  })
+
+  it("never returns NaN when legacy data contains invalid values", () => {
+    const dictionary = new Map([
+      ["valid", { lemma: "valid", level: "p" as const, index: 1 }],
+      ["broken", { lemma: "broken", level: "o" as const, index: 2 }],
+    ])
+    const probabilities = { p: 0.5, m: 0, h: 0, "4": 0, "6": 0, g: 0, o: Number.NaN }
+    const statuses = { valid: "known", broken: "mastered" } as never
+
+    expect(estimateVocabularySize(dictionary, probabilities, statuses)).toBe(1)
+    expect(estimateVocabularyRange(Number.NaN, Number.NaN)).toEqual({ low: 0, high: 0 })
   })
 
   it("does not repeat words from earlier assessment rounds", () => {

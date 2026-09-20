@@ -176,15 +176,21 @@ export function createVocabularyWordbookState(state: VocabularyHunterState, rawN
 
 export function migrateVocabularyHunterState(
   state: Omit<Partial<VocabularyHunterState>, "statuses"> & {
-    statuses?: Record<string, VocabularyStatus | "learning" | "ignored">
+    statuses?: Record<string, string>
   },
 ): VocabularyHunterState {
-  const statuses = Object.fromEntries(
-    Object.entries(state.statuses ?? {}).map(([word, status]) => [
-      word,
-      status === "learning" ? "fuzzy" : status === "ignored" ? "known" : status,
-    ]),
-  ) as Record<string, VocabularyStatus>
+  const statuses: Record<string, VocabularyStatus> = {}
+  Object.entries(state.statuses ?? {}).forEach(([rawWord, rawStatus]) => {
+    const word = rawWord.trim().toLocaleLowerCase()
+    const status =
+      rawStatus === "learning" ? "fuzzy" : rawStatus === "ignored" ? "known" : rawStatus
+    if (
+      /^[a-z]+(?:'[a-z]+)?$/.test(word) &&
+      (status === "known" || status === "fuzzy" || status === "unknown")
+    ) {
+      statuses[word] = status
+    }
+  })
   const enabledDictionaries = SUPPORTED_DICTIONARIES.filter((dictionary) =>
     state.enabledDictionaries?.includes(dictionary),
   )
