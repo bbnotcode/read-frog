@@ -7,6 +7,7 @@ export type VocabularyAssessmentResponse = "known" | "unsure" | "unknown"
 export interface VocabularyAssessment {
   version: 1
   probabilities: Record<VocabularyLevel, number>
+  previousProbabilities: Record<VocabularyLevel, number> | null
   levelScores: Record<VocabularyLevel, number>
   levelCounts: Record<VocabularyLevel, number>
   pseudoScore: number
@@ -184,6 +185,7 @@ export function scoreVocabularyAssessment(
   return {
     version: 1,
     probabilities,
+    previousProbabilities: previous?.probabilities ?? null,
     levelScores,
     levelCounts,
     pseudoScore,
@@ -194,6 +196,22 @@ export function scoreVocabularyAssessment(
     sampleSize: (previous?.sampleSize ?? 0) + answers.length,
     falsePositiveRate,
   }
+}
+
+export function estimateVocabularySize(
+  dictionary: Map<string, VocabularyWordInfo>,
+  probabilities: Record<VocabularyLevel, number>,
+) {
+  const lemmaLevels = new Map<number, VocabularyLevel>()
+  dictionary.forEach((info) => lemmaLevels.set(info.index, info.level))
+  const estimate = [...lemmaLevels.values()].reduce((sum, level) => sum + probabilities[level], 0)
+  return Math.round(estimate / 100) * 100
+}
+
+export function estimateVocabularyRange(estimate: number, confidence: number) {
+  const margin = Math.max(0.1, (1 - confidence) * 0.45)
+  const round = (value: number) => Math.max(0, Math.round(value / 500) * 500)
+  return { low: round(estimate * (1 - margin)), high: round(estimate * (1 + margin)) }
 }
 
 export function shouldHideAssessedWord(

@@ -11,6 +11,8 @@ import { sendMessage } from "@/utils/message"
 import {
   ASSESSMENT_LEVELS,
   createVocabularyAssessmentItems,
+  estimateVocabularyRange,
+  estimateVocabularySize,
   scoreVocabularyAssessment,
   type VocabularyAssessmentAnswer,
   type VocabularyAssessmentItem,
@@ -310,6 +312,18 @@ export function VocabularyHunterPage() {
     state.statusUpdatedAt,
     vocabularySort,
   ])
+  const vocabularyEstimate = useMemo(() => {
+    if (!state.vocabularyAssessment || dictionary.size === 0) return null
+    const current = estimateVocabularySize(dictionary, state.vocabularyAssessment.probabilities)
+    const previous = state.vocabularyAssessment.previousProbabilities
+      ? estimateVocabularySize(dictionary, state.vocabularyAssessment.previousProbabilities)
+      : null
+    return {
+      current,
+      previous,
+      range: estimateVocabularyRange(current, state.vocabularyAssessment.confidence),
+    }
+  }, [dictionary, state.vocabularyAssessment])
   const pageCount = Math.max(1, Math.ceil(words.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const pagedWords = useMemo(
@@ -696,20 +710,45 @@ export function VocabularyHunterPage() {
           ) : (
             <>
               {state.vocabularyAssessment ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {ASSESSMENT_LEVELS.map((level) => {
-                    const levelInfo = getVocabularyLevel(level)
-                    const probability = state.vocabularyAssessment!.probabilities[level]
-                    return (
-                      <div key={level} className="rounded-xl bg-muted/50 p-3">
-                        <div className="text-xs text-muted-foreground">{levelInfo.label}</div>
-                        <div className="mt-1 text-xl font-semibold">
-                          {Math.round(probability * 100)}%
-                        </div>
+                <>
+                  {vocabularyEstimate && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 dark:border-emerald-900 dark:bg-emerald-950/25">
+                      <div className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                        预计词汇量
                       </div>
-                    )
-                  })}
-                </div>
+                      <div className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+                        约 {vocabularyEstimate.current.toLocaleString()} 词
+                      </div>
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        估计区间 {vocabularyEstimate.range.low.toLocaleString()}–
+                        {vocabularyEstimate.range.high.toLocaleString()} 词
+                        {vocabularyEstimate.previous !== null && (
+                          <span className="ml-2">
+                            · 较上一轮
+                            {vocabularyEstimate.current >= vocabularyEstimate.previous ? "+" : ""}
+                            {(
+                              vocabularyEstimate.current - vocabularyEstimate.previous
+                            ).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {ASSESSMENT_LEVELS.map((level) => {
+                      const levelInfo = getVocabularyLevel(level)
+                      const probability = state.vocabularyAssessment!.probabilities[level]
+                      return (
+                        <div key={level} className="rounded-xl bg-muted/50 p-3">
+                          <div className="text-xs text-muted-foreground">{levelInfo.label}</div>
+                          <div className="mt-1 text-xl font-semibold">
+                            {Math.round(probability * 100)}%
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               ) : (
                 <div className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">
                   尚未评估。测试约 34 题，包含少量看起来像英文的伪词，用来校正误认和猜测。
@@ -739,7 +778,7 @@ export function VocabularyHunterPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 每轮结果会累积更新，不会覆盖上一轮。自动过滤仅作用于未手动判断的词；你按 A、S、D
-                设置的状态始终优先。
+                设置的状态始终优先。词汇量按本地词库中的词族估算，区间比单个数字更可靠。
               </p>
             </>
           )}

@@ -90,6 +90,12 @@ function sanitizePreferencePatch(patch: VocabularyHunterPreferencePatch) {
       assessment.pseudoCount >= 0 &&
       Number.isFinite(assessment.rounds) &&
       assessment.rounds >= 1 &&
+      (assessment.previousProbabilities === null ||
+        [...LEVELS].every((level) => {
+          const value =
+            assessment.previousProbabilities?.[level as keyof typeof assessment.probabilities]
+          return Number.isFinite(value) && value! >= 0 && value! <= 1
+        })) &&
       [...LEVELS].every((level) => {
         const value = assessment.probabilities[level as keyof typeof assessment.probabilities]
         const score = assessment.levelScores[level as keyof typeof assessment.levelScores]

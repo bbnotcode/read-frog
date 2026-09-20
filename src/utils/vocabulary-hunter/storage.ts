@@ -241,6 +241,13 @@ export function migrateVocabularyHunterState(
   const vocabularyAssessment = isValidAssessment
     ? {
         ...savedAssessment,
+        previousProbabilities:
+          savedAssessment.previousProbabilities &&
+          assessmentLevels.every((level) =>
+            Number.isFinite(savedAssessment.previousProbabilities?.[level]),
+          )
+            ? savedAssessment.previousProbabilities
+            : null,
         levelScores: Object.fromEntries(
           assessmentLevels.map((level) => [
             level,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   ASSESSMENT_LEVELS,
+  estimateVocabularySize,
   scoreVocabularyAssessment,
   type VocabularyAssessmentAnswer,
 } from "../assessment"
@@ -58,5 +59,20 @@ describe("vocabulary assessment", () => {
     expect(second.sampleSize).toBe(first.sampleSize + round.length)
     expect(second.levelCounts.p).toBe(8)
     expect(second.confidence).toBeGreaterThan(first.confidence)
+    expect(second.previousProbabilities).toEqual(first.probabilities)
+  })
+
+  it("estimates known lemmas without counting inflections twice", () => {
+    const dictionary = new Map<string, { lemma: string; level: "p"; index: number }>(
+      Array.from(
+        { length: 100 },
+        (_, index) =>
+          [`word-${index}`, { lemma: `word-${index}`, level: "p" as const, index }] as const,
+      ),
+    )
+    dictionary.set("learned", { lemma: "word-0", level: "p", index: 0 })
+    const probabilities = { p: 1, m: 0, h: 0, "4": 0, "6": 0, g: 0, o: 0 }
+
+    expect(estimateVocabularySize(dictionary, probabilities)).toBe(100)
   })
 })
