@@ -330,8 +330,12 @@ async function start(ctx: ContentScriptContext) {
   if (!("highlights" in CSS) || typeof Highlight === "undefined") return
 
   let state = await getVocabularyHunterState()
-  const vocabularyDictionary = await loadVocabularyDictionary().catch(() => undefined)
-  if (vocabularyDictionary) {
+  let vocabularyDictionary: Awaited<ReturnType<typeof loadVocabularyDictionary>> | undefined
+  const ensureVocabularyDictionary = async () => {
+    if (vocabularyDictionary) return vocabularyDictionary
+    vocabularyDictionary = await loadVocabularyDictionary().catch(() => undefined)
+    if (!vocabularyDictionary) return undefined
+
     const mergedState = await mergeKnownWordsFromSync(state, vocabularyDictionary).catch(
       () => state,
     )
@@ -342,10 +346,15 @@ async function start(ctx: ContentScriptContext) {
         deletedAt: mergedState.deletedAt,
       })
     }
+    return vocabularyDictionary
   }
+
+  if (state.enabled) await ensureVocabularyDictionary()
   let trackedRanges: TrackedRange[] = []
+  const rangesByTextNode = new Map<Text, TrackedRange[]>()
   let selected: TrackedRange | null = null
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  let refreshGeneration = 0
   let hideTimer: ReturnType<typeof setTimeout> | undefined
   let hoverTimer: ReturnType<typeof setTimeout> | undefined
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
@@ -606,123 +615,208 @@ async function start(ctx: ContentScriptContext) {
     fuzzyHighlight.clear()
     trackedRanges.forEach(({ range }) => range.detach())
     trackedRanges = []
+    rangesByTextNode.clear()
   }
 
-  const refresh = () => {
+  const removeRangesForTextNode = (node: Text) => {
+    const ranges = rangesByTextNode.get(node)
+    if (!ranges) return
+    ranges.forEach(({ range }) => {
+      unknownHighlight.delete(range)
+      fuzzyHighlight.delete(range)
+      range.detach()
+    })
+    const removedRanges = new Set(ranges)
+    trackedRanges = trackedRanges.filter((item) => !removedRanges.has(item))
+    rangesByTextNode.delete(node)
+  }
+
+  const removeDisconnectedRanges = () => {
+    for (const node of rangesByTextNode.keys()) {
+      if (!node.isConnected) removeRangesForTextNode(node)
+    }
+  }
+
+  const addTrackedRange = (item: TrackedRange) => {
+    trackedRanges.push(item)
+    const node = item.range.startContainer as Text
+    const ranges = rangesByTextNode.get(node)
+    if (ranges) ranges.push(item)
+    else rangesByTextNode.set(node, [item])
+    if (state.statuses[item.word] === "fuzzy") fuzzyHighlight.add(item.range)
+    else unknownHighlight.add(item.range)
+  }
+
+  const yieldToMainThread = async () => {
+    const scheduling = (
+      globalThis as typeof globalThis & {
+        scheduler?: { yield?: () => Promise<void> }
+      }
+    ).scheduler
+    if (scheduling?.yield) await scheduling.yield()
+    else await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  }
+
+  const scanTextNode = (
+    node: Text,
+    englishContextCache: WeakMap<Element, boolean>,
+    enabledLevels: ReadonlySet<VocabularyLevel>,
+  ) => {
+    removeRangesForTextNode(node)
+    if (!isTextNodeEligible(node, host) || trackedRanges.length >= MAX_RANGES) return
+
+    const languageContext = findLanguageContext(node)
+    let isEnglish = false
+    if (languageContext) {
+      const cachedIsEnglish = englishContextCache.get(languageContext)
+      if (cachedIsEnglish === undefined) {
+        isEnglish = isEnglishVocabularyContext(languageContext.textContent ?? "")
+        englishContextCache.set(languageContext, isEnglish)
+      } else {
+        isEnglish = cachedIsEnglish
+      }
+    }
+
+    for (const occurrence of findCandidateWords(
+      node.data,
+      state.minimumLength,
+      state.statuses,
+      vocabularyDictionary,
+      enabledLevels,
+    )) {
+      if (trackedRanges.length >= MAX_RANGES) break
+      const explicitStatus = state.statuses[occurrence.word]
+      if (!isEnglish && explicitStatus !== "unknown" && explicitStatus !== "fuzzy") continue
+      if (isUsernameMention(node, occurrence.start)) continue
+      const range = document.createRange()
+      range.setStart(node, occurrence.start)
+      range.setEnd(node, occurrence.end)
+      addTrackedRange({ range, word: occurrence.word, level: occurrence.level })
+    }
+  }
+
+  const refresh = async () => {
+    const generation = ++refreshGeneration
     clearHighlights()
     if (!state.enabled || !document.body) return
+    await ensureVocabularyDictionary()
+    if (generation !== refreshGeneration || !state.enabled) return
 
     const englishContextCache = new WeakMap<Element, boolean>()
+    const enabledLevels = new Set(state.enabledLevels)
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    let visitedNodes = 0
     while (walker.nextNode() && trackedRanges.length < MAX_RANGES) {
       const node = walker.currentNode as Text
-      if (!isTextNodeEligible(node, host)) continue
-      const languageContext = findLanguageContext(node)
-      let isEnglish = false
-      if (languageContext) {
-        const cachedIsEnglish = englishContextCache.get(languageContext)
-        if (cachedIsEnglish === undefined) {
-          isEnglish = isEnglishVocabularyContext(languageContext.textContent ?? "")
-          englishContextCache.set(languageContext, isEnglish)
-        } else {
-          isEnglish = cachedIsEnglish
-        }
-      }
-      for (const occurrence of findCandidateWords(
-        node.data,
-        state.minimumLength,
-        state.statuses,
-        vocabularyDictionary,
-        new Set(state.enabledLevels),
-      )) {
-        if (trackedRanges.length >= MAX_RANGES) break
-        const explicitStatus = state.statuses[occurrence.word]
-        if (!isEnglish && explicitStatus !== "unknown" && explicitStatus !== "fuzzy") continue
-        if (isUsernameMention(node, occurrence.start)) continue
-        const range = document.createRange()
-        range.setStart(node, occurrence.start)
-        range.setEnd(node, occurrence.end)
-        trackedRanges.push({ range, word: occurrence.word, level: occurrence.level })
-        if (state.statuses[occurrence.word] === "fuzzy") fuzzyHighlight.add(range)
-        else unknownHighlight.add(range)
+      scanTextNode(node, englishContextCache, enabledLevels)
+      visitedNodes += 1
+      if (visitedNodes % 60 === 0) {
+        await yieldToMainThread()
+        if (generation !== refreshGeneration || !state.enabled) return
       }
     }
   }
 
-  const scheduleRefresh = () => {
-    clearTimeout(refreshTimer)
-    refreshTimer = setTimeout(refresh, 350)
+  const pendingTextNodes = new Set<Text>()
+  const queueTextNodes = (root: Node) => {
+    if (root instanceof Text) {
+      pendingTextNodes.add(root)
+      return
+    }
+    if (!(root instanceof Element)) return
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) pendingTextNodes.add(walker.currentNode as Text)
   }
 
-  const hitTest = (event: MouseEvent) => {
+  const processPendingTextNodes = async () => {
+    refreshTimer = undefined
+    if (!state.enabled) {
+      pendingTextNodes.clear()
+      return
+    }
+    do {
+      removeDisconnectedRanges()
+      const nodes = [...pendingTextNodes]
+      pendingTextNodes.clear()
+      const englishContextCache = new WeakMap<Element, boolean>()
+      const enabledLevels = new Set(state.enabledLevels)
+      for (let index = 0; index < nodes.length; index += 1) {
+        const node = nodes[index]
+        if (node.isConnected) scanTextNode(node, englishContextCache, enabledLevels)
+        if ((index + 1) % 40 === 0) await yieldToMainThread()
+      }
+    } while (state.enabled && pendingTextNodes.size)
+  }
+
+  const schedulePendingTextNodes = () => {
+    if (refreshTimer !== undefined) return
+    refreshTimer = setTimeout(() => void processPendingTextNodes(), 50)
+  }
+
+  const hitTest = (clientX: number, clientY: number, target: EventTarget | null) => {
+    if (!(target instanceof Node) || isVocabularyInteractiveTarget(target)) return undefined
+    const documentWithCaret = document as Document & {
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+      caretRangeFromPoint?: (x: number, y: number) => Range | null
+    }
+    const position = documentWithCaret.caretPositionFromPoint?.(clientX, clientY)
+    const fallbackRange = position
+      ? null
+      : documentWithCaret.caretRangeFromPoint?.(clientX, clientY)
+    const node = position?.offsetNode ?? fallbackRange?.startContainer
+    const offset = position?.offset ?? fallbackRange?.startOffset
+    if (!(node instanceof Text) || offset === undefined) return undefined
+    return rangesByTextNode
+      .get(node)
+      ?.find(({ range }) => offset >= range.startOffset && offset < range.endOffset)
+  }
+
+  let mouseMoveFrame: number | undefined
+  let latestMouseMove: MouseEvent | undefined
+  const processMouseMove = () => {
+    mouseMoveFrame = undefined
+    const event = latestMouseMove
+    latestMouseMove = undefined
+    if (!event || !state.enabled || event.composedPath().includes(host)) return
+    const hit = hitTest(event.clientX, event.clientY, event.target)
+    if (!hit) {
+      hideCardSoon()
+      return
+    }
+    const selection = window.getSelection()
+    if (selection && !selection.isCollapsed) {
+      if (selectedFromTextSelection && card.classList.contains("open")) {
+        clearTimeout(hideTimer)
+        return
+      }
+      hideCardSoon()
+      return
+    }
+    if (card.classList.contains("open") && selected?.range === hit.range) return
+    if (pendingHover?.range === hit.range) return
+    clearTimeout(hoverTimer)
+    pendingHover = hit
+    hoverTimer = setTimeout(() => {
+      if (pendingHover?.range === hit.range) showCard(hit)
+    }, 650)
+  }
+  const handleMouseMove = (event: MouseEvent) => {
+    latestMouseMove = event
+    if (mouseMoveFrame === undefined) mouseMoveFrame = requestAnimationFrame(processMouseMove)
+  }
+  document.addEventListener("mousemove", handleMouseMove, true)
+
+  const handlePageClick = (event: MouseEvent) => {
+    if (!state.enabled || event.composedPath().includes(host)) return
     const target = event.target
-    if (!(target instanceof Node)) return undefined
-    if (isVocabularyInteractiveTarget(target)) return undefined
-
-    return trackedRanges
-      .filter(({ range }) => {
-        const parent = range.startContainer.parentElement
-        if (!parent || !(parent === target || parent.contains(target) || target.contains(parent))) {
-          return false
-        }
-        return Array.from(range.getClientRects()).some(
-          (rect) =>
-            event.clientX >= rect.left &&
-            event.clientX <= rect.right &&
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom,
-        )
-      })
-      .sort((left, right) => {
-        const leftRect = left.range.getBoundingClientRect()
-        const rightRect = right.range.getBoundingClientRect()
-        return leftRect.width * leftRect.height - rightRect.width * rightRect.height
-      })[0]
+    if (target instanceof Node && isVocabularyInteractiveTarget(target)) return
+    const hit = hitTest(event.clientX, event.clientY, target)
+    if (!hit) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    showCard(hit)
   }
-
-  document.addEventListener(
-    "mousemove",
-    (event) => {
-      if (!state.enabled || event.composedPath().includes(host)) return
-      const hit = hitTest(event)
-      if (!hit) {
-        hideCardSoon()
-        return
-      }
-      const selection = window.getSelection()
-      if (selection && !selection.isCollapsed) {
-        if (selectedFromTextSelection && card.classList.contains("open")) {
-          clearTimeout(hideTimer)
-          return
-        }
-        hideCardSoon()
-        return
-      }
-      if (card.classList.contains("open") && selected?.range === hit.range) return
-      if (pendingHover?.range === hit.range) return
-      clearTimeout(hoverTimer)
-      pendingHover = hit
-      hoverTimer = setTimeout(() => {
-        if (pendingHover?.range === hit.range) showCard(hit)
-      }, 650)
-    },
-    true,
-  )
-
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (!state.enabled || event.composedPath().includes(host)) return
-      const target = event.target
-      if (target instanceof Node && isVocabularyInteractiveTarget(target)) return
-      const hit = hitTest(event)
-      if (!hit) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      showCard(hit)
-    },
-    true,
-  )
+  document.addEventListener("click", handlePageClick, true)
 
   const showSelectedWord = () => {
     if (!state.enabled) return
@@ -833,14 +927,18 @@ async function start(ctx: ContentScriptContext) {
     }
 
     const matchingRanges = trackedRanges.filter((item) => item.word === word)
-    matchingRanges.forEach(({ range }) => {
+    matchingRanges.forEach((item) => {
+      const { range } = item
+      const node = range.startContainer as Text
       unknownHighlight.delete(range)
       fuzzyHighlight.delete(range)
       range.detach()
+      const nodeRanges = rangesByTextNode.get(node)?.filter((candidate) => candidate !== item)
+      if (nodeRanges?.length) rangesByTextNode.set(node, nodeRanges)
+      else rangesByTextNode.delete(node)
     })
     trackedRanges = trackedRanges.filter((item) => item.word !== word)
 
-    refresh()
     if (
       preferredRange?.startContainer.isConnected &&
       (status === "unknown" || status === "fuzzy") &&
@@ -853,9 +951,7 @@ async function start(ctx: ContentScriptContext) {
           item.range.endOffset === preferredRange.endOffset,
       )
     ) {
-      trackedRanges.push({ range: preferredRange, word, level })
-      if (status === "fuzzy") fuzzyHighlight.add(preferredRange)
-      else unknownHighlight.add(preferredRange)
+      addTrackedRange({ range: preferredRange, word, level })
     }
     const update = await sendMessage("updateVocabularyWord", { word, status, updatedAt })
     if (!update.applied) state = await getVocabularyHunterState()
@@ -980,16 +1076,27 @@ async function start(ctx: ContentScriptContext) {
   })
 
   const observer = new MutationObserver((mutations) => {
-    if (mutations.some((mutation) => !host.contains(mutation.target))) scheduleRefresh()
+    let shouldCleanDisconnectedRanges = false
+    for (const mutation of mutations) {
+      if (host.contains(mutation.target)) continue
+      if (mutation.type === "characterData") {
+        queueTextNodes(mutation.target)
+        continue
+      }
+      mutation.addedNodes.forEach(queueTextNodes)
+      if (mutation.removedNodes.length) shouldCleanDisconnectedRanges = true
+    }
+    if (shouldCleanDisconnectedRanges) removeDisconnectedRanges()
+    if (pendingTextNodes.size) schedulePendingTextNodes()
   })
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 
-  refresh()
+  void refresh()
   const unwatchState = watchVocabularyHunterState((nextState) => {
     state = nextState
     highlightStyles.update(state)
     applyDictionaryOrder()
-    refresh()
+    void refresh()
   })
 
   ctx.onInvalidated(() => {
@@ -998,6 +1105,7 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hoverTimer)
     clearTimeout(gistSyncTimer)
     clearTimeout(toastTimer)
+    if (mouseMoveFrame !== undefined) cancelAnimationFrame(mouseMoveFrame)
     observer.disconnect()
     cardResizeObserver.disconnect()
     window.removeEventListener("resize", keepCardInViewport)
@@ -1008,6 +1116,8 @@ async function start(ctx: ContentScriptContext) {
     )
     document.removeEventListener("keydown", handleShortcut, true)
     document.removeEventListener("mouseup", showSelectedWord, true)
+    document.removeEventListener("mousemove", handleMouseMove, true)
+    document.removeEventListener("click", handlePageClick, true)
     unwatchState()
     clearHighlights()
     CSS.highlights.delete(UNKNOWN_HIGHLIGHT)

@@ -107,6 +107,8 @@ const BASIC_WORDS = new Set(
   ].map((word) => word.toLowerCase()),
 )
 
+const ENGLISH_WORD_SEGMENTER = new Intl.Segmenter("en-US", { granularity: "word" })
+
 export function normalizeWord(word: string) {
   return word.toLocaleLowerCase("en-US").replace(/[’']/g, "'")
 }
@@ -128,10 +130,9 @@ export function findCandidateWords(
   dictionary?: Map<string, VocabularyWordInfo>,
   enabledLevels?: ReadonlySet<VocabularyLevel>,
 ) {
-  const segmenter = new Intl.Segmenter("en-US", { granularity: "word" })
   const occurrences: WordOccurrence[] = []
 
-  for (const segment of segmenter.segment(text)) {
+  for (const segment of ENGLISH_WORD_SEGMENTER.segment(text)) {
     if (!segment.isWordLike) continue
 
     const word = normalizeWord(segment.segment)
