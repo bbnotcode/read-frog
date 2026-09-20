@@ -741,7 +741,7 @@ async function start(ctx: ContentScriptContext) {
       const englishContextCache = new WeakMap<Element, boolean>()
       const enabledLevels = new Set(state.enabledLevels)
       for (let index = 0; index < nodes.length; index += 1) {
-        const node = nodes[index]
+        const node = nodes[index]!
         if (node.isConnected) scanTextNode(node, englishContextCache, enabledLevels)
         if ((index + 1) % 40 === 0) await yieldToMainThread()
       }
