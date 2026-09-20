@@ -76,6 +76,7 @@ const WORD_BANK = [
 ]
 
 const PSEUDOWORDS = ["flinterous", "brastify", "morbical", "trellic", "dovinate", "pransive"]
+export const LEGACY_ASSESSMENT_WORDS = [...WORD_BANK, ...PSEUDOWORDS]
 
 function hash(seed: number) {
   let value = seed | 0

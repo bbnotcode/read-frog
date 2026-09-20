@@ -1,6 +1,6 @@
-import type { VocabularyAssessment } from "./assessment"
 import type { VocabularyLevel, VocabularyStatus } from "./candidates"
 import { storage } from "#imports"
+import { LEGACY_ASSESSMENT_WORDS, type VocabularyAssessment } from "./assessment"
 
 export const VOCABULARY_HUNTER_STORAGE_KEY = "local:vocabulary-hunter"
 const VOCABULARY_HUNTER_SECRET_KEY = "local:vocabulary-hunter-secret"
@@ -250,7 +250,7 @@ export function migrateVocabularyHunterState(
             : null,
         testedWords: Array.isArray(savedAssessment.testedWords)
           ? [...new Set(savedAssessment.testedWords.filter((word) => /^[a-z]{2,32}$/.test(word)))]
-          : [],
+          : [...LEGACY_ASSESSMENT_WORDS],
         levelScores: Object.fromEntries(
           assessmentLevels.map((level) => [
             level,
