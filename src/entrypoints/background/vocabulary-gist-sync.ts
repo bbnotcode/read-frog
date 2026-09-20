@@ -77,16 +77,32 @@ function sanitizePreferencePatch(patch: VocabularyHunterPreferencePatch) {
       Number.isFinite(assessment.testedAt) &&
       Number.isFinite(assessment.sampleSize) &&
       assessment.sampleSize >= 1 &&
-      assessment.sampleSize <= 100 &&
+      assessment.sampleSize <= 100_000 &&
       Number.isFinite(assessment.confidence) &&
       assessment.confidence >= 0 &&
       assessment.confidence <= 1 &&
       Number.isFinite(assessment.falsePositiveRate) &&
       assessment.falsePositiveRate >= 0 &&
       assessment.falsePositiveRate <= 1 &&
+      Number.isFinite(assessment.pseudoScore) &&
+      assessment.pseudoScore >= 0 &&
+      Number.isFinite(assessment.pseudoCount) &&
+      assessment.pseudoCount >= 0 &&
+      Number.isFinite(assessment.rounds) &&
+      assessment.rounds >= 1 &&
       [...LEVELS].every((level) => {
         const value = assessment.probabilities[level as keyof typeof assessment.probabilities]
-        return Number.isFinite(value) && value >= 0 && value <= 1
+        const score = assessment.levelScores[level as keyof typeof assessment.levelScores]
+        const count = assessment.levelCounts[level as keyof typeof assessment.levelCounts]
+        return (
+          Number.isFinite(value) &&
+          value >= 0 &&
+          value <= 1 &&
+          Number.isFinite(score) &&
+          score >= 0 &&
+          Number.isFinite(count) &&
+          count >= 0
+        )
       })
     ) {
       safe.vocabularyAssessment = assessment

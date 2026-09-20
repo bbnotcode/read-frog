@@ -526,7 +526,7 @@ export function VocabularyHunterPage() {
     const nextAnswers = [...assessmentAnswers, { ...item, response }]
     setAssessmentAnswers(nextAnswers)
     if (nextAnswers.length !== assessmentItems.length) return
-    const vocabularyAssessment = scoreVocabularyAssessment(nextAnswers)
+    const vocabularyAssessment = scoreVocabularyAssessment(nextAnswers, state.vocabularyAssessment)
     updateState({ ...state, vocabularyAssessment })
     setAssessmentItems([])
     setAssessmentAnswers([])
@@ -717,14 +717,16 @@ export function VocabularyHunterPage() {
               )}
               {state.vocabularyAssessment && (
                 <p className="text-sm text-muted-foreground">
-                  置信度 {Math.round(state.vocabularyAssessment.confidence * 100)}%，误认校正率
+                  已累计 {state.vocabularyAssessment.rounds} 轮、
+                  {state.vocabularyAssessment.sampleSize} 题；置信度
+                  {Math.round(state.vocabularyAssessment.confidence * 100)}%，误认校正率
                   {Math.round(state.vocabularyAssessment.falsePositiveRate * 100)}
                   %。只保存这组汇总结果，不保存逐题答案。
                 </p>
               )}
               <div className="flex flex-wrap gap-3">
                 <Button disabled={dictionary.size === 0} onClick={startVocabularyAssessment}>
-                  {state.vocabularyAssessment ? "重新测试" : "开始测试"}
+                  {state.vocabularyAssessment ? "继续测试 34 题" : "开始首轮测试"}
                 </Button>
                 {state.vocabularyAssessment && (
                   <Button
@@ -736,7 +738,8 @@ export function VocabularyHunterPage() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                自动过滤仅作用于未手动判断的词；你按 A、S、D 设置的状态始终优先。
+                每轮结果会累积更新，不会覆盖上一轮。自动过滤仅作用于未手动判断的词；你按 A、S、D
+                设置的状态始终优先。
               </p>
             </>
           )}

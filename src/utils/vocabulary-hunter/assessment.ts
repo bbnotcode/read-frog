@@ -7,6 +7,11 @@ export type VocabularyAssessmentResponse = "known" | "unsure" | "unknown"
 export interface VocabularyAssessment {
   version: 1
   probabilities: Record<VocabularyLevel, number>
+  levelScores: Record<VocabularyLevel, number>
+  levelCounts: Record<VocabularyLevel, number>
+  pseudoScore: number
+  pseudoCount: number
+  rounds: number
   confidence: number
   testedAt: number
   sampleSize: number
@@ -141,32 +146,52 @@ function monotonicKnownProbabilities(values: number[]) {
 
 export function scoreVocabularyAssessment(
   answers: VocabularyAssessmentAnswer[],
+  previous: VocabularyAssessment | null = null,
   testedAt = Date.now(),
 ): VocabularyAssessment {
   const pseudoAnswers = answers.filter((answer) => answer.isPseudoword)
   const responseScore = (response: VocabularyAssessmentResponse) =>
     response === "known" ? 1 : response === "unsure" ? 0.5 : 0
-  const falsePositiveRate = pseudoAnswers.length
-    ? pseudoAnswers.reduce((sum, answer) => sum + responseScore(answer.response), 0) /
-      pseudoAnswers.length
-    : 0
+  const pseudoScore =
+    (previous?.pseudoScore ?? 0) +
+    pseudoAnswers.reduce((sum, answer) => sum + responseScore(answer.response), 0)
+  const pseudoCount = (previous?.pseudoCount ?? 0) + pseudoAnswers.length
+  const falsePositiveRate = pseudoCount ? pseudoScore / pseudoCount : 0
+  const levelScores = Object.fromEntries(
+    ASSESSMENT_LEVELS.map((level) => {
+      const points = answers
+        .filter((answer) => !answer.isPseudoword && answer.level === level)
+        .reduce((sum, answer) => sum + responseScore(answer.response), 0)
+      return [level, (previous?.levelScores[level] ?? 0) + points]
+    }),
+  ) as Record<VocabularyLevel, number>
+  const levelCounts = Object.fromEntries(
+    ASSESSMENT_LEVELS.map((level) => [
+      level,
+      (previous?.levelCounts[level] ?? 0) +
+        answers.filter((answer) => !answer.isPseudoword && answer.level === level).length,
+    ]),
+  ) as Record<VocabularyLevel, number>
   const rawProbabilities = ASSESSMENT_LEVELS.map((level) => {
-    const levelAnswers = answers.filter((answer) => !answer.isPseudoword && answer.level === level)
-    const points = levelAnswers.reduce((sum, answer) => sum + responseScore(answer.response), 0)
-    const smoothed = (points + 0.5) / (levelAnswers.length + 1)
+    const smoothed = (levelScores[level] + 0.5) / (levelCounts[level] + 1)
     return clamp((smoothed - falsePositiveRate) / Math.max(0.2, 1 - falsePositiveRate))
   })
   const monotonicProbabilities = monotonicKnownProbabilities(rawProbabilities)
   const probabilities = Object.fromEntries(
     ASSESSMENT_LEVELS.map((level, index) => [level, monotonicProbabilities[index]]),
   ) as Record<VocabularyLevel, number>
-  const realAnswerCount = answers.length - pseudoAnswers.length
+  const realAnswerCount = ASSESSMENT_LEVELS.reduce((sum, level) => sum + levelCounts[level], 0)
   return {
     version: 1,
     probabilities,
-    confidence: clamp((realAnswerCount / 28) * (1 - falsePositiveRate)),
+    levelScores,
+    levelCounts,
+    pseudoScore,
+    pseudoCount,
+    rounds: (previous?.rounds ?? 0) + 1,
+    confidence: clamp((1 - Math.exp(-realAnswerCount / 35)) * (1 - falsePositiveRate)),
     testedAt,
-    sampleSize: answers.length,
+    sampleSize: (previous?.sampleSize ?? 0) + answers.length,
     falsePositiveRate,
   }
 }
@@ -176,6 +201,6 @@ export function shouldHideAssessedWord(
   level: VocabularyLevel | undefined,
 ) {
   return Boolean(
-    assessment && assessment.confidence >= 0.6 && level && assessment.probabilities[level] >= 0.85,
+    assessment && assessment.confidence >= 0.5 && level && assessment.probabilities[level] >= 0.85,
   )
 }

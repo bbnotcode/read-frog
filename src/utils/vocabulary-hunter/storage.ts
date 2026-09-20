@@ -227,7 +227,7 @@ export function migrateVocabularyHunterState(
       ? requestedWordbook
       : DEFAULT_VOCABULARY_WORDBOOK
   const savedAssessment = state.vocabularyAssessment
-  const vocabularyAssessment =
+  const isValidAssessment =
     savedAssessment?.version === 1 &&
     Number.isFinite(savedAssessment.testedAt) &&
     Number.isFinite(savedAssessment.sampleSize) &&
@@ -236,8 +236,34 @@ export function migrateVocabularyHunterState(
     ["p", "m", "h", "4", "6", "g", "o"].every((level) =>
       Number.isFinite(savedAssessment.probabilities?.[level as VocabularyLevel]),
     )
-      ? savedAssessment
-      : null
+  const assessmentLevels: VocabularyLevel[] = ["p", "m", "h", "4", "6", "g", "o"]
+  const legacyCount = Math.max(1, Math.floor((savedAssessment?.sampleSize ?? 34) / 7))
+  const vocabularyAssessment = isValidAssessment
+    ? {
+        ...savedAssessment,
+        levelScores: Object.fromEntries(
+          assessmentLevels.map((level) => [
+            level,
+            Number.isFinite(savedAssessment.levelScores?.[level])
+              ? savedAssessment.levelScores[level]
+              : savedAssessment.probabilities[level] * legacyCount,
+          ]),
+        ) as Record<VocabularyLevel, number>,
+        levelCounts: Object.fromEntries(
+          assessmentLevels.map((level) => [
+            level,
+            Number.isFinite(savedAssessment.levelCounts?.[level])
+              ? savedAssessment.levelCounts[level]
+              : legacyCount,
+          ]),
+        ) as Record<VocabularyLevel, number>,
+        pseudoScore: Number.isFinite(savedAssessment.pseudoScore)
+          ? savedAssessment.pseudoScore
+          : savedAssessment.falsePositiveRate * 6,
+        pseudoCount: Number.isFinite(savedAssessment.pseudoCount) ? savedAssessment.pseudoCount : 6,
+        rounds: Number.isFinite(savedAssessment.rounds) ? savedAssessment.rounds : 1,
+      }
+    : null
 
   return {
     ...DEFAULT_VOCABULARY_HUNTER_STATE,

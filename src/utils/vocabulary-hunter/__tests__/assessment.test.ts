@@ -15,7 +15,7 @@ describe("vocabulary assessment", () => {
         response: levelIndex === 3 ? "known" : levelIndex < 3 ? "unsure" : "unknown",
       })),
     )
-    const assessment = scoreVocabularyAssessment(answers, 123)
+    const assessment = scoreVocabularyAssessment(answers, null, 123)
     const values = ASSESSMENT_LEVELS.map((level) => assessment.probabilities[level])
     expect(values.every((value, index) => index === 0 || values[index - 1]! >= value)).toBe(true)
     expect(assessment.testedAt).toBe(123)
@@ -40,5 +40,23 @@ describe("vocabulary assessment", () => {
     ])
     expect(overclaimed.probabilities.p).toBeLessThan(honest.probabilities.p)
     expect(overclaimed.confidence).toBeLessThan(honest.confidence)
+  })
+
+  it("accumulates later rounds without storing individual answers", () => {
+    const round = ASSESSMENT_LEVELS.flatMap((level) =>
+      Array.from({ length: 4 }, (_, index): VocabularyAssessmentAnswer => ({
+        word: `${level}-${index}`,
+        level,
+        isPseudoword: false,
+        response: "known",
+      })),
+    )
+    const first = scoreVocabularyAssessment(round)
+    const second = scoreVocabularyAssessment(round, first)
+
+    expect(second.rounds).toBe(2)
+    expect(second.sampleSize).toBe(first.sampleSize + round.length)
+    expect(second.levelCounts.p).toBe(8)
+    expect(second.confidence).toBeGreaterThan(first.confidence)
   })
 })
