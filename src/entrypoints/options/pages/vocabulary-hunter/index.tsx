@@ -561,6 +561,9 @@ export function VocabularyHunterPage() {
           </div>
           <div>
             <div className="mb-3 font-medium">标注词汇等级</div>
+            <p className="mb-3 text-sm text-muted-foreground">
+              等级为词频与考试范围的近似参考。复数、时态和派生词会优先继承词族中更基础词的等级。
+            </p>
             <div className="grid gap-2 md:grid-cols-2">
               {VOCABULARY_LEVELS.map((level) => (
                 <label

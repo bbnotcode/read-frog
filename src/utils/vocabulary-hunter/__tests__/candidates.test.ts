@@ -51,4 +51,55 @@ describe("vocabulary hunter candidates", () => {
       ).map(({ word }) => word),
     ).toEqual(["remember", "customterm"])
   })
+
+  it("treats inflections and conservative derivatives as known word families", () => {
+    const dictionary = new Map([
+      ["surprise", { lemma: "surprise", level: "m" as const, index: 1 }],
+      ["surprisingly", { lemma: "surprisingly", level: "4" as const, index: 2 }],
+      ["surprising", { lemma: "surprise", level: "m" as const, index: 1 }],
+      ["require", { lemma: "require", level: "h" as const, index: 3 }],
+      ["requirement", { lemma: "requirement", level: "h" as const, index: 4 }],
+      ["requirements", { lemma: "requirement", level: "h" as const, index: 4 }],
+    ])
+
+    expect(
+      findCandidateWords(
+        "Surprisingly, these requirements surprised us.",
+        2,
+        { surprise: "known", require: "known" },
+        dictionary,
+        new Set(["p", "m", "h", "4", "6", "g", "o"] as const),
+      ),
+    ).toEqual([])
+  })
+
+  it("lets an explicit learning status override a known base word", () => {
+    const dictionary = new Map([
+      ["require", { lemma: "require", level: "h" as const, index: 1 }],
+      ["requirement", { lemma: "requirement", level: "h" as const, index: 2 }],
+    ])
+
+    expect(
+      findCandidateWords(
+        "Requirement",
+        2,
+        { require: "known", requirement: "unknown" },
+        dictionary,
+        new Set(["h"] as const),
+      ).map(({ word }) => word),
+    ).toEqual(["requirement"])
+  })
+
+  it("does not merge ambiguous -ly words into unrelated bases", () => {
+    const dictionary = new Map([
+      ["like", { lemma: "like", level: "p" as const, index: 1 }],
+      ["likely", { lemma: "likely", level: "h" as const, index: 2 }],
+    ])
+
+    expect(
+      findCandidateWords("Likely", 2, { like: "known" }, dictionary, new Set(["h"] as const)).map(
+        ({ word }) => word,
+      ),
+    ).toEqual(["likely"])
+  })
 })

@@ -7,13 +7,13 @@ export const VOCABULARY_LEVELS: Array<{
   description: string
   rank: number
 }> = [
-  { id: "p", label: "基础 A1", description: "小学与最高频基础词", rank: 1 },
-  { id: "m", label: "基础 A2", description: "初中常用词", rank: 2 },
-  { id: "h", label: "高中 / B1", description: "高中核心词汇", rank: 3 },
-  { id: "4", label: "CET-4 / B2", description: "大学英语四级词汇", rank: 4 },
-  { id: "6", label: "CET-6 / IELTS", description: "六级及雅思常见进阶词", rank: 5 },
-  { id: "g", label: "TOEFL / GRE", description: "托福、GRE 学术词汇", rank: 6 },
-  { id: "o", label: "学术扩展", description: "词库中的其他低频词", rank: 7 },
+  { id: "p", label: "高频基础", description: "小学及 A1 左右的高频词", rank: 1 },
+  { id: "m", label: "日常基础", description: "初中及 A2 左右的常用词", rank: 2 },
+  { id: "h", label: "核心进阶", description: "高中及 B1 左右的核心词", rank: 3 },
+  { id: "4", label: "通用进阶", description: "CET-4 及 B2 左右的通用词", rank: 4 },
+  { id: "6", label: "学术进阶", description: "CET-6、IELTS 常见词", rank: 5 },
+  { id: "g", label: "高阶学术", description: "TOEFL、GRE 常见高阶词", rank: 6 },
+  { id: "o", label: "低频扩展", description: "专业、低频及词库扩展词", rank: 7 },
 ]
 
 let dictionaryPromise: Promise<Map<string, VocabularyWordInfo>> | null = null
