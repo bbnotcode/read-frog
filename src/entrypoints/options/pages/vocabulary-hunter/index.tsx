@@ -530,7 +530,13 @@ export function VocabularyHunterPage() {
   }
 
   const startVocabularyAssessment = () => {
-    setAssessmentItems(createVocabularyAssessmentItems(dictionary))
+    setAssessmentItems(
+      createVocabularyAssessmentItems(
+        dictionary,
+        Date.now(),
+        new Set(state.vocabularyAssessment?.testedWords ?? []),
+      ),
+    )
     setAssessmentAnswers([])
   }
 
@@ -778,7 +784,8 @@ export function VocabularyHunterPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 每轮结果会累积更新，不会覆盖上一轮。自动过滤仅作用于未手动判断的词；你按 A、S、D
-                设置的状态始终优先。词汇量按本地词库中的词族估算，区间比单个数字更可靠。
+                设置的状态始终优先。已经测试过的词不会再次出题；本地只保存已出题词，不保存答案。
+                词汇量按本地词库中的词族估算，区间比单个数字更可靠。
               </p>
             </>
           )}

@@ -248,6 +248,9 @@ export function migrateVocabularyHunterState(
           )
             ? savedAssessment.previousProbabilities
             : null,
+        testedWords: Array.isArray(savedAssessment.testedWords)
+          ? [...new Set(savedAssessment.testedWords.filter((word) => /^[a-z]{2,32}$/.test(word)))]
+          : [],
         levelScores: Object.fromEntries(
           assessmentLevels.map((level) => [
             level,

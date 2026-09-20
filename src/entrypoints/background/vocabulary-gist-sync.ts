@@ -90,6 +90,9 @@ function sanitizePreferencePatch(patch: VocabularyHunterPreferencePatch) {
       assessment.pseudoCount >= 0 &&
       Number.isFinite(assessment.rounds) &&
       assessment.rounds >= 1 &&
+      Array.isArray(assessment.testedWords) &&
+      assessment.testedWords.length <= 20_000 &&
+      assessment.testedWords.every((word) => /^[a-z]{2,32}$/.test(word)) &&
       (assessment.previousProbabilities === null ||
         [...LEVELS].every((level) => {
           const value =

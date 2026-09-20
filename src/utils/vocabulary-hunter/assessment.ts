@@ -8,6 +8,7 @@ export interface VocabularyAssessment {
   version: 1
   probabilities: Record<VocabularyLevel, number>
   previousProbabilities: Record<VocabularyLevel, number> | null
+  testedWords: string[]
   levelScores: Record<VocabularyLevel, number>
   levelCounts: Record<VocabularyLevel, number>
   pseudoScore: number
@@ -100,24 +101,49 @@ function shuffled<T>(items: T[], seed: number) {
 export function createVocabularyAssessmentItems(
   dictionary: Map<string, VocabularyWordInfo>,
   seed = Date.now(),
+  excludedWords: ReadonlySet<string> = new Set(),
 ) {
   const byLevel = new Map<VocabularyLevel, VocabularyAssessmentItem[]>()
+  const fallbackByLevel = new Map<VocabularyLevel, VocabularyAssessmentItem[]>()
   ASSESSMENT_LEVELS.forEach((level) => byLevel.set(level, []))
+  ASSESSMENT_LEVELS.forEach((level) => fallbackByLevel.set(level, []))
   WORD_BANK.forEach((word) => {
     const info = dictionary.get(word)
-    if (!info || info.lemma !== word) return
+    if (!info || info.lemma !== word || excludedWords.has(word)) return
     byLevel.get(info.level)?.push({ word, level: info.level, isPseudoword: false })
   })
+  dictionary.forEach((info, word) => {
+    if (
+      word !== info.lemma ||
+      excludedWords.has(word) ||
+      WORD_BANK.includes(word) ||
+      !/^[a-z]{4,16}$/.test(word)
+    ) {
+      return
+    }
+    fallbackByLevel.get(info.level)?.push({ word, level: info.level, isPseudoword: false })
+  })
 
-  // Four independent observations per band are enough for a short screening;
-  // later monotonic smoothing borrows strength from adjacent levels.
-  const realItems = ASSESSMENT_LEVELS.flatMap((level, index) =>
-    shuffled(byLevel.get(level) ?? [], seed + index).slice(0, 4),
-  )
-  const pseudowords = PSEUDOWORDS.filter((word) => !dictionary.has(word)).map((word) => ({
-    word,
-    isPseudoword: true,
-  }))
+  const realItems = ASSESSMENT_LEVELS.flatMap((level, index) => {
+    const preferred = shuffled(byLevel.get(level) ?? [], seed + index)
+    const fallback = shuffled(fallbackByLevel.get(level) ?? [], seed + index + 101)
+    return [...preferred, ...fallback].slice(0, 4)
+  })
+  const pseudowords: VocabularyAssessmentItem[] = []
+  const usedWords = new Set([...excludedWords, ...realItems.map((item) => item.word)])
+  const starts = ["br", "cl", "dr", "fl", "gl", "pr", "st", "tr", "v"]
+  const middles = ["a", "e", "i", "o", "u", "ai", "ori", "eli"]
+  const endings = ["ble", "ful", "ical", "ish", "ment", "ous", "ive", "ity"]
+  const preferredPseudowords = shuffled(PSEUDOWORDS, seed + 211)
+  let attempt = 0
+  while (pseudowords.length < 6) {
+    const generated = `${starts[(seed + attempt * 3) % starts.length]}${middles[(seed + attempt * 5) % middles.length]}${endings[(seed + attempt * 7) % endings.length]}`
+    const word = preferredPseudowords[attempt] ?? generated
+    attempt += 1
+    if (dictionary.has(word) || usedWords.has(word)) continue
+    usedWords.add(word)
+    pseudowords.push({ word, isPseudoword: true })
+  }
   return shuffled([...realItems, ...pseudowords], seed)
 }
 
@@ -186,6 +212,9 @@ export function scoreVocabularyAssessment(
     version: 1,
     probabilities,
     previousProbabilities: previous?.probabilities ?? null,
+    testedWords: [
+      ...new Set([...(previous?.testedWords ?? []), ...answers.map((answer) => answer.word)]),
+    ],
     levelScores,
     levelCounts,
     pseudoScore,

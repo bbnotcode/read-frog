@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   ASSESSMENT_LEVELS,
+  createVocabularyAssessmentItems,
   estimateVocabularySize,
   scoreVocabularyAssessment,
   type VocabularyAssessmentAnswer,
@@ -74,5 +75,26 @@ describe("vocabulary assessment", () => {
     const probabilities = { p: 1, m: 0, h: 0, "4": 0, "6": 0, g: 0, o: 0 }
 
     expect(estimateVocabularySize(dictionary, probabilities)).toBe(100)
+  })
+
+  it("does not repeat words from earlier assessment rounds", () => {
+    const dictionary = new Map(
+      ASSESSMENT_LEVELS.flatMap((level, levelIndex) =>
+        Array.from({ length: 10 }, (_, wordIndex) => {
+          const word = `${String.fromCharCode(97 + levelIndex)}${String.fromCharCode(97 + wordIndex)}sample`
+          return [word, { lemma: word, level, index: levelIndex * 10 + wordIndex }] as const
+        }),
+      ),
+    )
+    const first = createVocabularyAssessmentItems(dictionary, 1)
+    const second = createVocabularyAssessmentItems(
+      dictionary,
+      2,
+      new Set(first.map((item) => item.word)),
+    )
+
+    expect(first).toHaveLength(34)
+    expect(second).toHaveLength(34)
+    expect(second.some((item) => first.some((earlier) => earlier.word === item.word))).toBe(false)
   })
 })

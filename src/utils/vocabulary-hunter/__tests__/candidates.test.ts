@@ -112,6 +112,7 @@ describe("vocabulary hunter candidates", () => {
       version: 1 as const,
       probabilities: { p: 0.99, m: 0.95, h: 0.9, "4": 0.7, "6": 0.3, g: 0.1, o: 0.05 },
       previousProbabilities: null,
+      testedWords: [],
       levelScores: { p: 4, m: 4, h: 4, "4": 3, "6": 1, g: 0, o: 0 },
       levelCounts: { p: 4, m: 4, h: 4, "4": 4, "6": 4, g: 4, o: 4 },
       pseudoScore: 0,
