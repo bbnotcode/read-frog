@@ -271,11 +271,39 @@ export function estimateVocabularyRange(estimate: number, confidence: number) {
   }
 }
 
+export function createPredictedKnownIndices(
+  dictionary: Map<string, VocabularyWordInfo>,
+  assessment: VocabularyAssessment | null,
+  statuses: Record<string, VocabularyStatus>,
+) {
+  const predicted = new Set<number>()
+  if (!assessment || assessment.confidence < 0.5) return predicted
+
+  const lemmas = new Map<number, string>()
+  dictionary.forEach((info) => lemmas.set(info.index, info.lemma))
+  const targetCount = estimateVocabularySize(dictionary, assessment.probabilities, statuses)
+  const orderedLemmas = [...lemmas.entries()].sort(([left], [right]) => left - right)
+
+  orderedLemmas.forEach(([index, lemma]) => {
+    if (statuses[lemma] === "known") predicted.add(index)
+  })
+  for (const [index, lemma] of orderedLemmas) {
+    if (predicted.size >= targetCount) break
+    if (statuses[lemma] === "unknown" || statuses[lemma] === "fuzzy") continue
+    predicted.add(index)
+  }
+  return predicted
+}
+
 export function shouldHideAssessedWord(
   assessment: VocabularyAssessment | null,
-  level: VocabularyLevel | undefined,
+  wordIndex: number | undefined,
+  predictedKnownIndices: ReadonlySet<number>,
 ) {
   return Boolean(
-    assessment && assessment.confidence >= 0.5 && level && assessment.probabilities[level] >= 0.85,
+    assessment &&
+    assessment.confidence >= 0.5 &&
+    typeof wordIndex === "number" &&
+    predictedKnownIndices.has(wordIndex),
   )
 }

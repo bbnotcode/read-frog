@@ -755,10 +755,10 @@ export function VocabularyHunterPage() {
                         )}
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground" aria-live="polite">
-                        已明确标记掌握 {explicitVocabularyCounts.known.toLocaleString()}
-                        词、待巩固 {explicitVocabularyCounts.fuzzy.toLocaleString()}
-                        词、未掌握 {explicitVocabularyCounts.unknown.toLocaleString()}
-                        词；修改标记后会实时重算。
+                        全部明确标记掌握 {counts.known.toLocaleString()} 词，其中
+                        {explicitVocabularyCounts.known.toLocaleString()}
+                        个可映射到测评词库；待巩固 {counts.fuzzy.toLocaleString()} 词、未掌握
+                        {counts.unknown.toLocaleString()} 词。预测结果会直接用于网页生词筛选。
                       </div>
                     </div>
                   )}

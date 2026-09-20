@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   ASSESSMENT_LEVELS,
+  createPredictedKnownIndices,
   createVocabularyAssessmentItems,
   estimateVocabularyRange,
   estimateVocabularySize,
@@ -105,6 +106,32 @@ describe("vocabulary assessment", () => {
 
     expect(estimateVocabularySize(dictionary, probabilities, statuses)).toBe(1)
     expect(estimateVocabularyRange(Number.NaN, Number.NaN)).toEqual({ low: 0, high: 0 })
+  })
+
+  it("builds an exact predicted-known set while preserving explicit judgements", () => {
+    const dictionary = new Map(
+      Array.from({ length: 10 }, (_, index) => [
+        `word-${index}`,
+        { lemma: `word-${index}`, level: "p" as const, index },
+      ]),
+    )
+    const assessment = scoreVocabularyAssessment(
+      Array.from({ length: 4 }, (_, index): VocabularyAssessmentAnswer => ({
+        word: `sample-${index}`,
+        level: "p",
+        isPseudoword: false,
+        response: index < 2 ? "known" : "unknown",
+      })),
+    )
+    assessment.confidence = 0.9
+    const statuses = { "word-0": "unknown" as const, "word-9": "known" as const }
+    const predicted = createPredictedKnownIndices(dictionary, assessment, statuses)
+
+    expect(predicted.has(0)).toBe(false)
+    expect(predicted.has(9)).toBe(true)
+    expect(predicted.size).toBe(
+      estimateVocabularySize(dictionary, assessment.probabilities, statuses),
+    )
   })
 
   it("does not repeat words from earlier assessment rounds", () => {

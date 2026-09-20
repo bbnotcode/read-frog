@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { createPredictedKnownIndices, estimateVocabularySize } from "../assessment"
 import { findCandidateWords, normalizeSelectedWord, normalizeWord } from "../candidates"
 
 describe("vocabulary hunter candidates", () => {
@@ -132,8 +133,9 @@ describe("vocabulary hunter candidates", () => {
         dictionary,
         new Set(["h", "4"] as const),
         assessment,
+        createPredictedKnownIndices(dictionary, assessment, { require: "unknown" }),
       ).map(({ word }) => word),
-    ).toEqual(["require", "reluctant"])
+    ).toEqual(["require"])
     expect(
       findCandidateWords(
         "Require reluctant",
@@ -142,7 +144,49 @@ describe("vocabulary hunter candidates", () => {
         dictionary,
         new Set(["h", "4"] as const),
         assessment,
+        createPredictedKnownIndices(dictionary, assessment, {}),
       ).map(({ word }) => word),
-    ).toEqual(["reluctant"])
+    ).toEqual([])
+  })
+
+  it("turns an estimated vocabulary size into stable per-word filtering", () => {
+    const dictionary = new Map(
+      Array.from({ length: 10 }, (_, index) => {
+        const word = `sample${String.fromCharCode(97 + index)}`
+        return [word, { lemma: word, level: "h" as const, index }] as const
+      }),
+    )
+    const assessment = {
+      version: 1 as const,
+      probabilities: { p: 0, m: 0, h: 0.6, "4": 0, "6": 0, g: 0, o: 0 },
+      previousProbabilities: null,
+      testedWords: [],
+      levelScores: { p: 0, m: 0, h: 3, "4": 0, "6": 0, g: 0, o: 0 },
+      levelCounts: { p: 0, m: 0, h: 5, "4": 0, "6": 0, g: 0, o: 0 },
+      pseudoScore: 0,
+      pseudoCount: 1,
+      rounds: 1,
+      confidence: 0.9,
+      testedAt: 1,
+      sampleSize: 10,
+      falsePositiveRate: 0,
+    }
+    const predictedKnownCount = estimateVocabularySize(dictionary, assessment.probabilities)
+    const statuses = { sampleb: "unknown" as const, samplej: "known" as const }
+    const predictedKnownIndices = createPredictedKnownIndices(dictionary, assessment, statuses)
+    const text = [...dictionary.keys()].join(" ")
+
+    expect(predictedKnownCount).toBe(6)
+    expect(
+      findCandidateWords(
+        text,
+        2,
+        statuses,
+        dictionary,
+        new Set(["h"] as const),
+        assessment,
+        predictedKnownIndices,
+      ).map(({ word }) => word),
+    ).toEqual(["sampleb", "sampleg", "sampleh", "samplei"])
   })
 })

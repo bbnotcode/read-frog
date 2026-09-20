@@ -3,6 +3,7 @@ import { defineContentScript } from "#imports"
 import { getLocalConfig } from "@/utils/config/storage"
 import { sendMessage } from "@/utils/message"
 import { resolveVocabularyDictionaryAction } from "@/utils/vocabulary-hunter/ai-action"
+import { createPredictedKnownIndices } from "@/utils/vocabulary-hunter/assessment"
 import {
   findCandidateWords,
   normalizeSelectedWord,
@@ -332,6 +333,7 @@ async function start(ctx: ContentScriptContext) {
 
   let state = await getVocabularyHunterState()
   let vocabularyDictionary: Awaited<ReturnType<typeof loadVocabularyDictionary>> | undefined
+  let predictedKnownIndices: ReadonlySet<number> = new Set()
   const ensureVocabularyDictionary = async () => {
     if (vocabularyDictionary) return vocabularyDictionary
     vocabularyDictionary = await loadVocabularyDictionary().catch(() => undefined)
@@ -347,6 +349,11 @@ async function start(ctx: ContentScriptContext) {
         deletedAt: mergedState.deletedAt,
       })
     }
+    predictedKnownIndices = createPredictedKnownIndices(
+      vocabularyDictionary,
+      state.vocabularyAssessment,
+      state.statuses,
+    )
     return vocabularyDictionary
   }
 
@@ -685,6 +692,7 @@ async function start(ctx: ContentScriptContext) {
       vocabularyDictionary,
       enabledLevels,
       state.vocabularyAssessment,
+      predictedKnownIndices,
     )) {
       if (trackedRanges.length >= MAX_RANGES) break
       const explicitStatus = state.statuses[occurrence.word]
@@ -703,6 +711,11 @@ async function start(ctx: ContentScriptContext) {
     if (!state.enabled || !document.body) return
     await ensureVocabularyDictionary()
     if (generation !== refreshGeneration || !state.enabled) return
+    predictedKnownIndices = createPredictedKnownIndices(
+      vocabularyDictionary ?? new Map(),
+      state.vocabularyAssessment,
+      state.statuses,
+    )
 
     const englishContextCache = new WeakMap<Element, boolean>()
     const enabledLevels = new Set(state.enabledLevels)

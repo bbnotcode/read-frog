@@ -281,6 +281,7 @@ export function findCandidateWords(
   dictionary?: Map<string, VocabularyWordInfo>,
   enabledLevels?: ReadonlySet<VocabularyLevel>,
   assessment: VocabularyAssessment | null = null,
+  predictedKnownIndices: ReadonlySet<number> = new Set(),
 ) {
   const occurrences: WordOccurrence[] = []
 
@@ -296,16 +297,25 @@ export function findCandidateWords(
     const isKnownThroughFamily =
       status === undefined &&
       family?.lemmas.some((familyLemma) => statuses[familyLemma] === "known")
+    const isPredictedKnown =
+      status === undefined &&
+      family?.lemmas.some((familyLemma) =>
+        shouldHideAssessedWord(
+          assessment,
+          dictionary?.get(familyLemma)?.index,
+          predictedKnownIndices,
+        ),
+      )
     const effectiveLevel = family?.level ?? wordInfo?.level
     if (
       !/^[a-z]+(?:'[a-z]+)?$/i.test(word) ||
       status === "known" ||
       isKnownThroughFamily ||
+      isPredictedKnown ||
       (!isExplicitLearningWord &&
         (word.length < minimumLength ||
           (!dictionary && BASIC_WORDS.has(word)) ||
           (effectiveLevel && enabledLevels && !enabledLevels.has(effectiveLevel)) ||
-          shouldHideAssessedWord(assessment, effectiveLevel) ||
           (dictionary && !wordInfo)))
     ) {
       continue
