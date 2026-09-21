@@ -17,6 +17,7 @@ import {
 } from "@/utils/vocabulary-hunter/dictionary-data"
 import { lookupEmbeddedDictionary } from "@/utils/vocabulary-hunter/dictionary-lookup"
 import { isEnglishVocabularyContext } from "@/utils/vocabulary-hunter/english-context"
+import { pointIntersectsAnyRect } from "@/utils/vocabulary-hunter/hover-stability"
 import {
   eventComesFromEditableControl,
   isVocabularyInteractiveTarget,
@@ -368,6 +369,17 @@ function positionCard(card: HTMLElement, hit: TrackedRange) {
   card.style.top = `${top}px`
 }
 
+function isPointOverTrackedRange(hit: TrackedRange, clientX: number, clientY: number) {
+  if (
+    hit.range.startContainer.isConnected &&
+    pointIntersectsAnyRect(clientX, clientY, hit.range.getClientRects())
+  ) {
+    return true
+  }
+  const anchoredRect = getTrackedRangeRect(hit)
+  return anchoredRect ? pointIntersectsAnyRect(clientX, clientY, [anchoredRect]) : false
+}
+
 function statusText(word: string, state: VocabularyHunterState) {
   const status = state.statuses[word]
   if (status === "known") return "已确认掌握，不再标注"
@@ -452,6 +464,7 @@ async function start(ctx: ContentScriptContext) {
   let gistSyncTimer: ReturnType<typeof setTimeout> | undefined
   let toastTimer: ReturnType<typeof setTimeout> | undefined
   let pendingHover: TrackedRange | null = null
+  let latestPointerPosition: { clientX: number; clientY: number } | undefined
   let selectedFromTextSelection = false
   let activeExternalRequestId: number | undefined
   let requestSequence = 0
@@ -697,6 +710,18 @@ async function start(ctx: ContentScriptContext) {
     pendingHover = null
     clearTimeout(hideTimer)
     hideTimer = setTimeout(() => {
+      if (
+        card.matches(":hover") ||
+        (selected &&
+          latestPointerPosition &&
+          isPointOverTrackedRange(
+            selected,
+            latestPointerPosition.clientX,
+            latestPointerPosition.clientY,
+          ))
+      ) {
+        return
+      }
       card.classList.remove("open")
       requestSequence += 1
     }, 260)
@@ -864,10 +889,17 @@ async function start(ctx: ContentScriptContext) {
       : documentWithCaret.caretRangeFromPoint?.(clientX, clientY)
     const node = position?.offsetNode ?? fallbackRange?.startContainer
     const offset = position?.offset ?? fallbackRange?.startOffset
-    if (!(node instanceof Text) || offset === undefined) return undefined
-    return rangesByTextNode
-      .get(node)
-      ?.find(({ range }) => offset >= range.startOffset && offset < range.endOffset)
+    if (node instanceof Text && offset !== undefined) {
+      const caretHit = rangesByTextNode
+        .get(node)
+        ?.find(({ range }) => offset >= range.startOffset && offset < range.endOffset)
+      if (caretHit) return caretHit
+    }
+
+    for (const candidate of [selected, pendingHover]) {
+      if (candidate && isPointOverTrackedRange(candidate, clientX, clientY)) return candidate
+    }
+    return undefined
   }
 
   let mouseMoveFrame: number | undefined
@@ -882,6 +914,7 @@ async function start(ctx: ContentScriptContext) {
       hideCardSoon()
       return
     }
+    clearTimeout(hideTimer)
     const selection = window.getSelection()
     if (selection && !selection.isCollapsed) {
       if (selectedFromTextSelection && card.classList.contains("open")) {
@@ -900,6 +933,7 @@ async function start(ctx: ContentScriptContext) {
     }, 650)
   }
   const handleMouseMove = (event: MouseEvent) => {
+    latestPointerPosition = { clientX: event.clientX, clientY: event.clientY }
     latestMouseMove = event
     if (mouseMoveFrame === undefined) mouseMoveFrame = requestAnimationFrame(processMouseMove)
   }
