@@ -7,6 +7,7 @@ import { createPredictedKnownIndices } from "@/utils/vocabulary-hunter/assessmen
 import {
   findCandidateWords,
   normalizeSelectedWord,
+  resolveVocabularyWord,
   type VocabularyLevel,
   type VocabularyStatus,
 } from "@/utils/vocabulary-hunter/candidates"
@@ -936,12 +937,12 @@ async function start(ctx: ContentScriptContext) {
     ) {
       return
     }
-    const wordInfo = vocabularyDictionary?.get(normalizedWord)
+    const wordInfo = resolveVocabularyWord(normalizedWord, vocabularyDictionary)
     showCard(
       {
         range: range.cloneRange(),
-        word: wordInfo?.lemma ?? normalizedWord,
-        level: wordInfo?.level,
+        word: wordInfo.lemma,
+        level: wordInfo.level,
       },
       "selection",
     )
@@ -1083,11 +1084,12 @@ async function start(ctx: ContentScriptContext) {
     if (key === "d" && pageSelection && !pageSelection.isCollapsed) {
       const normalizedWord = normalizeSelectedWord(pageSelection.toString())
       if (!normalizedWord) return
-      const word = vocabularyDictionary?.get(normalizedWord)?.lemma ?? normalizedWord
+      const wordInfo = resolveVocabularyWord(normalizedWord, vocabularyDictionary)
+      const word = wordInfo.lemma
       const selectedRange = pageSelection.rangeCount
         ? pageSelection.getRangeAt(0).cloneRange()
         : null
-      const selectedLevel = vocabularyDictionary?.get(normalizedWord)?.level
+      const selectedLevel = wordInfo.level
       event.preventDefault()
       event.stopImmediatePropagation()
       card.classList.remove("open")

@@ -261,13 +261,31 @@ export function getVocabularyFamilyInfo(
 }
 
 export function normalizeWord(word: string) {
-  return word.toLocaleLowerCase("en-US").replace(/[’']/g, "'")
+  return word.toLocaleLowerCase("en-US").replace(/[’‘ʼ']/g, "'")
+}
+
+function removePossessiveSuffix(word: string) {
+  return word.endsWith("'s") && word.length > 2 ? word.slice(0, -2) : word
+}
+
+export function resolveVocabularyWord(
+  rawWord: string,
+  dictionary?: Map<string, VocabularyWordInfo>,
+) {
+  const normalizedWord = normalizeWord(rawWord)
+  const lookupWord = removePossessiveSuffix(normalizedWord)
+  const info = dictionary?.get(normalizedWord) ?? dictionary?.get(lookupWord)
+  return {
+    lemma: info?.lemma ?? lookupWord,
+    level: info?.level,
+    index: info?.index,
+  }
 }
 
 export function normalizeSelectedWord(selection: string) {
   const match = selection
     .trim()
-    .match(/^[\s"'“”‘’()[\]{},.!?:;]*([a-z]+(?:[’'][a-z]+)?)[\s"'“”‘’()[\]{},.!?:;]*$/i)
+    .match(/^[\s"'“”‘’()[\]{},.!?:;]*([a-z]+(?:[’‘ʼ'][a-z]+)?)[\s"'“”‘’()[\]{},.!?:;]*$/i)
   const selectedWord = match?.[1]
   if (!selectedWord) return undefined
   const word = normalizeWord(selectedWord)
@@ -289,8 +307,16 @@ export function findCandidateWords(
     if (!segment.isWordLike) continue
 
     const word = normalizeWord(segment.segment)
-    const wordInfo = dictionary?.get(word)
-    const lemma = wordInfo?.lemma ?? word
+    const resolvedWord = resolveVocabularyWord(word, dictionary)
+    const wordInfo =
+      resolvedWord.index === undefined
+        ? undefined
+        : {
+            lemma: resolvedWord.lemma,
+            level: resolvedWord.level!,
+            index: resolvedWord.index,
+          }
+    const lemma = resolvedWord.lemma
     const status = statuses[lemma]
     const isExplicitLearningWord = status === "unknown" || status === "fuzzy"
     const family = wordInfo && dictionary ? getVocabularyFamilyInfo(lemma, dictionary) : undefined

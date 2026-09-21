@@ -1,18 +1,49 @@
 import { describe, expect, it } from "vitest"
 import { createPredictedKnownIndices, estimateVocabularySize } from "../assessment"
-import { findCandidateWords, normalizeSelectedWord, normalizeWord } from "../candidates"
+import {
+  findCandidateWords,
+  normalizeSelectedWord,
+  normalizeWord,
+  resolveVocabularyWord,
+} from "../candidates"
 
 describe("vocabulary hunter candidates", () => {
   it("normalizes case and apostrophes", () => {
     expect(normalizeWord("LEARNER’S")).toBe("learner's")
+    expect(normalizeWord("TODAY‘S")).toBe("today's")
+    expect(normalizeWord("TODAYʼS")).toBe("today's")
   })
 
   it("accepts only one selected English word", () => {
     expect(normalizeSelectedWord("  Forgotten  ")).toBe("forgotten")
     expect(normalizeSelectedWord("isn't")).toBe("isn't")
+    expect(normalizeSelectedWord("today‘s")).toBe("today's")
     expect(normalizeSelectedWord("“forgotten,”")).toBe("forgotten")
     expect(normalizeSelectedWord("two words")).toBeUndefined()
     expect(normalizeSelectedWord("RyukGram v1.3.3")).toBeUndefined()
+  })
+
+  it("resolves possessives to their known base word", () => {
+    const dictionary = new Map([
+      ["today", { lemma: "today", level: "p" as const, index: 1 }],
+      ["student", { lemma: "student", level: "m" as const, index: 2 }],
+      ["students", { lemma: "student", level: "m" as const, index: 2 }],
+    ])
+
+    expect(resolveVocabularyWord("today’s", dictionary)).toEqual({
+      lemma: "today",
+      level: "p",
+      index: 1,
+    })
+    expect(
+      findCandidateWords(
+        "Today's today’s today‘s lesson and the students' books.",
+        2,
+        { today: "known", student: "known" },
+        dictionary,
+        new Set(["p", "m"] as const),
+      ),
+    ).toEqual([])
   })
 
   it("keeps harder words and filters common or known words", () => {
