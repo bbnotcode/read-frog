@@ -59,6 +59,19 @@ interface TrackedRange {
   range: Range
   word: string
   level?: VocabularyLevel
+  anchor?: RangeAnchor
+}
+
+interface RangeAnchor {
+  rect: DOMRect
+  windowScrollX: number
+  windowScrollY: number
+  scrollContainers: Array<{
+    element: Element
+    rect: DOMRect
+    scrollLeft: number
+    scrollTop: number
+  }>
 }
 
 function isTextNodeEligible(node: Text, uiHost: HTMLElement) {
@@ -255,8 +268,77 @@ function findLinkForRange(range: Range) {
   return parent?.closest<HTMLAnchorElement>("a[href]") ?? null
 }
 
-function positionCard(card: HTMLElement, range: Range) {
-  const rect = range.getBoundingClientRect()
+function captureRangeAnchor(hit: TrackedRange, rect: DOMRect) {
+  const scrollContainers: RangeAnchor["scrollContainers"] = []
+  let ancestor = hit.range.startContainer.parentElement
+  while (ancestor) {
+    if (
+      ancestor.scrollHeight > ancestor.clientHeight ||
+      ancestor.scrollWidth > ancestor.clientWidth
+    ) {
+      scrollContainers.push({
+        element: ancestor,
+        rect: DOMRect.fromRect(ancestor.getBoundingClientRect()),
+        scrollLeft: ancestor.scrollLeft,
+        scrollTop: ancestor.scrollTop,
+      })
+    }
+    ancestor = ancestor.parentElement
+  }
+  hit.anchor = {
+    rect: DOMRect.fromRect(rect),
+    windowScrollX: window.scrollX,
+    windowScrollY: window.scrollY,
+    scrollContainers,
+  }
+}
+
+function getTrackedRangeRect(hit: TrackedRange) {
+  const liveRect = hit.range.getBoundingClientRect()
+  if (hit.range.startContainer.isConnected && (liveRect.width > 0 || liveRect.height > 0)) {
+    captureRangeAnchor(hit, liveRect)
+    return liveRect
+  }
+
+  if (!hit.anchor) return null
+  const scrollDelta = hit.anchor.scrollContainers.reduce(
+    (total, item) => {
+      const element = item.element.isConnected
+        ? item.element
+        : document
+            .elementsFromPoint(
+              item.rect.left + item.rect.width / 2,
+              item.rect.top + item.rect.height / 2,
+            )
+            .find(
+              (candidate) =>
+                (candidate.scrollHeight > candidate.clientHeight ||
+                  candidate.scrollWidth > candidate.clientWidth) &&
+                Math.abs(candidate.getBoundingClientRect().left - item.rect.left) < 2 &&
+                Math.abs(candidate.getBoundingClientRect().top - item.rect.top) < 2,
+            )
+      if (!element) return total
+      return {
+        x: total.x + element.scrollLeft - item.scrollLeft,
+        y: total.y + element.scrollTop - item.scrollTop,
+      }
+    },
+    {
+      x: window.scrollX - hit.anchor.windowScrollX,
+      y: window.scrollY - hit.anchor.windowScrollY,
+    },
+  )
+  return DOMRect.fromRect({
+    x: hit.anchor.rect.x - scrollDelta.x,
+    y: hit.anchor.rect.y - scrollDelta.y,
+    width: hit.anchor.rect.width,
+    height: hit.anchor.rect.height,
+  })
+}
+
+function positionCard(card: HTMLElement, hit: TrackedRange) {
+  const rect = getTrackedRangeRect(hit)
+  if (!rect) return
   const viewportPadding = 12
   const triggerGap = 12
   const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2)
@@ -305,7 +387,8 @@ async function openReadFrogDictionaryAction(hit: TrackedRange, requestId: number
   }
 
   const sentence = sentenceForRange(hit.range)
-  const rect = hit.range.getBoundingClientRect()
+  const rect = getTrackedRangeRect(hit)
+  if (!rect) throw new Error("单词位置已经失效，请重新选择单词。")
   openExternalSelectionCustomAction({
     requestId,
     actionId: action.id,
@@ -477,7 +560,7 @@ async function start(ctx: ContentScriptContext) {
     setActiveDictionary(dictionary)
     result.classList.add("open")
     result.innerHTML = `<div class="loading">${dictionary === "haici" ? "海词" : dictionary} 正在查询…</div>`
-    positionCard(card, hit.range)
+    positionCard(card, hit)
     try {
       const definition = await lookupEmbeddedDictionary(dictionary, hit.word)
       if (currentSequence !== requestSequence || selected?.word !== hit.word) return
@@ -563,7 +646,7 @@ async function start(ctx: ContentScriptContext) {
         })
         result.append(suggestions)
       }
-      positionCard(card, hit.range)
+      positionCard(card, hit)
     } catch (error) {
       if (currentSequence !== requestSequence) return
       renderResult(null, error instanceof Error ? error.message : "词典查询失败")
@@ -597,7 +680,7 @@ async function start(ctx: ContentScriptContext) {
     sourceLink.hidden = !link
     if (link) sourceLink.href = link.href
     card.classList.add("open")
-    positionCard(card, hit.range)
+    positionCard(card, hit)
     if (changedWord) {
       const defaultDictionary =
         state.dictionaryOrder.find(
@@ -872,11 +955,11 @@ async function start(ctx: ContentScriptContext) {
     if (!response || response.requestId !== activeExternalRequestId) return
     renderResult(response.value, response.error, response.complete)
     if (response.complete) activeExternalRequestId = undefined
-    if (selected) positionCard(card, selected.range)
+    if (selected) positionCard(card, selected)
   }
   window.addEventListener(EXTERNAL_CUSTOM_ACTION_RESULT_EVENT, handleExternalCustomActionResult)
   const keepCardInViewport = () => {
-    if (selected && card.classList.contains("open")) positionCard(card, selected.range)
+    if (selected && card.classList.contains("open")) positionCard(card, selected)
   }
   const cardResizeObserver = new ResizeObserver(keepCardInViewport)
   cardResizeObserver.observe(card)
