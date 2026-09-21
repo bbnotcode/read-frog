@@ -54,6 +54,98 @@ const AMBIGUOUS_LY_DERIVATIVES = new Set([
   "silly",
 ])
 
+// The bundled dictionary already lemmatizes most irregular inflections. Keep
+// this compact fallback for alternate dictionaries and words whose lemma was
+// imported as the surface form.
+const IRREGULAR_BASE_FORMS: Readonly<Record<string, readonly string[]>> = {
+  am: ["be"],
+  are: ["be"],
+  analyses: ["analysis"],
+  ate: ["eat"],
+  began: ["begin"],
+  begun: ["begin"],
+  been: ["be"],
+  best: ["good"],
+  better: ["good"],
+  bought: ["buy"],
+  brought: ["bring"],
+  built: ["build"],
+  came: ["come"],
+  children: ["child"],
+  chose: ["choose"],
+  chosen: ["choose"],
+  crises: ["crisis"],
+  criteria: ["criterion"],
+  did: ["do"],
+  does: ["do"],
+  done: ["do"],
+  drank: ["drink"],
+  driven: ["drive"],
+  drove: ["drive"],
+  eaten: ["eat"],
+  feet: ["foot"],
+  felt: ["feel"],
+  found: ["find"],
+  gave: ["give"],
+  geese: ["goose"],
+  given: ["give"],
+  gone: ["go"],
+  got: ["get"],
+  gotten: ["get"],
+  grew: ["grow"],
+  grown: ["grow"],
+  had: ["have"],
+  has: ["have"],
+  heard: ["hear"],
+  held: ["hold"],
+  indices: ["index"],
+  is: ["be"],
+  kept: ["keep"],
+  knew: ["know"],
+  known: ["know"],
+  left: ["leave"],
+  made: ["make"],
+  men: ["man"],
+  met: ["meet"],
+  mice: ["mouse"],
+  oxen: ["ox"],
+  paid: ["pay"],
+  people: ["person"],
+  phenomena: ["phenomenon"],
+  ran: ["run"],
+  said: ["say"],
+  sat: ["sit"],
+  saw: ["see"],
+  seen: ["see"],
+  sent: ["send"],
+  slept: ["sleep"],
+  sold: ["sell"],
+  spoke: ["speak"],
+  spoken: ["speak"],
+  stood: ["stand"],
+  swam: ["swim"],
+  swum: ["swim"],
+  taken: ["take"],
+  taught: ["teach"],
+  teeth: ["tooth"],
+  theses: ["thesis"],
+  thought: ["think"],
+  told: ["tell"],
+  took: ["take"],
+  understood: ["understand"],
+  was: ["be"],
+  went: ["go"],
+  were: ["be"],
+  women: ["woman"],
+  won: ["win"],
+  wore: ["wear"],
+  worn: ["wear"],
+  worse: ["bad"],
+  worst: ["bad"],
+  written: ["write"],
+  wrote: ["write"],
+}
+
 const BASIC_WORDS = new Set(
   [
     "about",
@@ -156,6 +248,8 @@ function addCandidate(candidates: Set<string>, value: string) {
 function possibleBaseForms(word: string) {
   const candidates = new Set<string>()
 
+  for (const base of IRREGULAR_BASE_FORMS[word] ?? []) candidates.add(base)
+
   if (word.endsWith("ies")) addCandidate(candidates, `${word.slice(0, -3)}y`)
   if (word.endsWith("ves")) {
     addCandidate(candidates, `${word.slice(0, -3)}f`)
@@ -177,10 +271,17 @@ function possibleBaseForms(word: string) {
       addCandidate(candidates, stem.slice(0, -1))
     }
   }
+  if (word.endsWith("ying")) addCandidate(candidates, `${word.slice(0, -4)}ie`)
+  if (word.endsWith("cking")) addCandidate(candidates, word.slice(0, -4))
+  if (word.endsWith("cked")) addCandidate(candidates, word.slice(0, -3))
   if (word.endsWith("ied")) addCandidate(candidates, `${word.slice(0, -3)}y`)
   if (word.endsWith("ier")) addCandidate(candidates, `${word.slice(0, -3)}y`)
   if (word.endsWith("iest")) addCandidate(candidates, `${word.slice(0, -4)}y`)
 
+  if (word.endsWith("ically")) addCandidate(candidates, `${word.slice(0, -6)}ic`)
+  if (word.endsWith("ably")) addCandidate(candidates, `${word.slice(0, -4)}able`)
+  if (word.endsWith("ibly")) addCandidate(candidates, `${word.slice(0, -4)}ible`)
+  if (word.endsWith("ally")) addCandidate(candidates, `${word.slice(0, -4)}al`)
   if (word.endsWith("ily")) addCandidate(candidates, `${word.slice(0, -3)}y`)
   if (word.endsWith("ly") && !AMBIGUOUS_LY_DERIVATIVES.has(word)) {
     addCandidate(candidates, word.slice(0, -2))
@@ -200,6 +301,8 @@ function possibleBaseForms(word: string) {
     "ible",
     "ship",
     "hood",
+    "ance",
+    "ence",
     "less",
     "ful",
     "ism",
@@ -211,6 +314,7 @@ function possibleBaseForms(word: string) {
     "ise",
     "ion",
     "al",
+    "en",
   ] as const) {
     if (!word.endsWith(suffix)) continue
     const stem = word.slice(0, -suffix.length)

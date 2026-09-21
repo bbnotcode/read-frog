@@ -105,6 +105,81 @@ describe("vocabulary hunter candidates", () => {
     ).toEqual([])
   })
 
+  it("treats common verb, plural, and spelling-changing forms as known", () => {
+    const words = [
+      "ask",
+      "asks",
+      "asked",
+      "asking",
+      "study",
+      "studies",
+      "studied",
+      "studying",
+      "lie",
+      "lying",
+      "panic",
+      "panicked",
+      "panicking",
+      "go",
+      "went",
+      "child",
+      "children",
+    ]
+    const dictionary = new Map(
+      words.map((word, index) => [word, { lemma: word, level: "m" as const, index }]),
+    )
+
+    expect(
+      findCandidateWords(
+        "Asks asked asking studies studied studying lying panicked panicking went children",
+        2,
+        { ask: "known", study: "known", lie: "known", panic: "known", go: "known", child: "known" },
+        dictionary,
+        new Set(["m"] as const),
+      ),
+    ).toEqual([])
+  })
+
+  it("recognizes high-confidence adjective, adverb, and noun derivations", () => {
+    const words = [
+      "basic",
+      "basically",
+      "comfortable",
+      "comfortably",
+      "possible",
+      "possibly",
+      "normal",
+      "normally",
+      "perform",
+      "performance",
+      "differ",
+      "difference",
+      "sharp",
+      "sharpen",
+    ]
+    const dictionary = new Map(
+      words.map((word, index) => [word, { lemma: word, level: "h" as const, index }]),
+    )
+
+    expect(
+      findCandidateWords(
+        "Basically comfortably possibly normally performance difference sharpen",
+        2,
+        {
+          basic: "known",
+          comfortable: "known",
+          possible: "known",
+          normal: "known",
+          perform: "known",
+          differ: "known",
+          sharp: "known",
+        },
+        dictionary,
+        new Set(["h"] as const),
+      ),
+    ).toEqual([])
+  })
+
   it("lets an explicit learning status override a known base word", () => {
     const dictionary = new Map([
       ["require", { lemma: "require", level: "h" as const, index: 1 }],
