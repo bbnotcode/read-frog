@@ -1,5 +1,6 @@
 import type { VocabularyLevel, VocabularyWordInfo } from "./candidates"
 import { browser } from "#imports"
+import { parseVocabularyDictionary } from "./dictionary-parser"
 
 export const VOCABULARY_LEVELS: Array<{
   id: VocabularyLevel
@@ -27,21 +28,7 @@ export function loadVocabularyDictionary() {
       if (!response.ok) throw new Error(`Vocabulary dictionary: ${response.status}`)
       return response.text()
     })
-    .then((text) => {
-      const dictionary = new Map<string, VocabularyWordInfo>()
-      const lemmaIndices = new Map<string, number>()
-      text.split("\n").forEach((line) => {
-        const [word, lemma, level] = line.trim().split(/\s+/)
-        if (!word || !lemma || !level) return
-        let index = lemmaIndices.get(lemma)
-        if (index === undefined) {
-          index = lemmaIndices.size
-          lemmaIndices.set(lemma, index)
-        }
-        dictionary.set(word, { lemma, level: level as VocabularyLevel, index })
-      })
-      return dictionary
-    })
+    .then(parseVocabularyDictionary)
 
   return dictionaryPromise
 }

@@ -17,6 +17,7 @@ import {
 } from "@/utils/vocabulary-hunter/dictionary-data"
 import { lookupEmbeddedDictionary } from "@/utils/vocabulary-hunter/dictionary-lookup"
 import { isEnglishVocabularyContext } from "@/utils/vocabulary-hunter/english-context"
+import { shouldRefreshVocabularyHighlights } from "@/utils/vocabulary-hunter/highlight-refresh"
 import { pointIntersectsAnyRect } from "@/utils/vocabulary-hunter/hover-stability"
 import {
   eventComesFromEditableControl,
@@ -842,6 +843,7 @@ async function start(ctx: ContentScriptContext) {
   }
 
   const pendingTextNodes = new Set<Text>()
+  let isProcessingPendingTextNodes = false
   const queueTextNodes = (root: Node) => {
     if (root instanceof Text) {
       pendingTextNodes.add(root)
@@ -854,22 +856,29 @@ async function start(ctx: ContentScriptContext) {
 
   const processPendingTextNodes = async () => {
     refreshTimer = undefined
+    if (isProcessingPendingTextNodes) return
     if (!state.enabled) {
       pendingTextNodes.clear()
       return
     }
-    do {
-      removeDisconnectedRanges()
-      const nodes = [...pendingTextNodes]
-      pendingTextNodes.clear()
-      const englishContextCache = new WeakMap<Element, boolean>()
-      const enabledLevels = new Set(state.enabledLevels)
-      for (let index = 0; index < nodes.length; index += 1) {
-        const node = nodes[index]!
-        if (node.isConnected) scanTextNode(node, englishContextCache, enabledLevels)
-        if ((index + 1) % 40 === 0) await yieldToMainThread()
-      }
-    } while (state.enabled && pendingTextNodes.size)
+    isProcessingPendingTextNodes = true
+    try {
+      do {
+        removeDisconnectedRanges()
+        const nodes = [...pendingTextNodes]
+        pendingTextNodes.clear()
+        const englishContextCache = new WeakMap<Element, boolean>()
+        const enabledLevels = new Set(state.enabledLevels)
+        for (let index = 0; index < nodes.length; index += 1) {
+          const node = nodes[index]!
+          if (node.isConnected) scanTextNode(node, englishContextCache, enabledLevels)
+          if ((index + 1) % 40 === 0) await yieldToMainThread()
+        }
+      } while (state.enabled && pendingTextNodes.size)
+    } finally {
+      isProcessingPendingTextNodes = false
+      if (state.enabled && pendingTextNodes.size) schedulePendingTextNodes()
+    }
   }
 
   const schedulePendingTextNodes = () => {
@@ -1231,10 +1240,11 @@ async function start(ctx: ContentScriptContext) {
 
   void refresh()
   const unwatchState = watchVocabularyHunterState((nextState) => {
+    const requiresRefresh = shouldRefreshVocabularyHighlights(state, nextState)
     state = nextState
     highlightStyles.update(state)
     applyDictionaryOrder()
-    void refresh()
+    if (requiresRefresh) void refresh()
   })
 
   ctx.onInvalidated(() => {
