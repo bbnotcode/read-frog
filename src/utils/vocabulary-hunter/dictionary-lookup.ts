@@ -16,6 +16,22 @@ export interface EmbeddedDictionaryResult {
 }
 
 const cache = new Map<string, EmbeddedDictionaryResult>()
+const MAX_MEMORY_CACHE_ENTRIES = 120
+
+function readCachedResult(cacheKey: string) {
+  const cached = cache.get(cacheKey)
+  if (!cached) return undefined
+  cache.delete(cacheKey)
+  cache.set(cacheKey, cached)
+  return cached
+}
+
+function cacheResult(cacheKey: string, result: EmbeddedDictionaryResult) {
+  cache.set(cacheKey, result)
+  if (cache.size <= MAX_MEMORY_CACHE_ENTRIES) return
+  const oldestKey = cache.keys().next().value
+  if (oldestKey) cache.delete(oldestKey)
+}
 
 const DICTIONARIES: Record<
   Exclude<VocabularyDictionary, "ai">,
@@ -150,7 +166,7 @@ export async function lookupEmbeddedDictionary(
   word: string,
 ): Promise<EmbeddedDictionaryResult> {
   const cacheKey = `${dictionary}:${word.toLocaleLowerCase()}`
-  const cached = cache.get(cacheKey)
+  const cached = readCachedResult(cacheKey)
   if (cached) return cached
 
   const definition = DICTIONARIES[dictionary]
@@ -177,7 +193,7 @@ export async function lookupEmbeddedDictionary(
     }
     if (!text) throw new Error("Google 词典没有返回可显示的释义")
     const result = { title: definition.title, text }
-    cache.set(cacheKey, result)
+    cacheResult(cacheKey, result)
     return result
   }
 
@@ -211,6 +227,6 @@ export async function lookupEmbeddedDictionary(
     suggestions: suggestions.length ? suggestions : undefined,
     entry,
   }
-  cache.set(cacheKey, result)
+  cacheResult(cacheKey, result)
   return result
 }

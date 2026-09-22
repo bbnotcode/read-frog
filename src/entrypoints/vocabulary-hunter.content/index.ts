@@ -2,6 +2,7 @@ import type { ContentScriptContext } from "#imports"
 import { defineContentScript } from "#imports"
 import { getLocalConfig } from "@/utils/config/storage"
 import { sendMessage } from "@/utils/message"
+import { scheduleIdleTask } from "@/utils/schedule-idle-task"
 import { resolveVocabularyDictionaryAction } from "@/utils/vocabulary-hunter/ai-action"
 import { createPredictedKnownIndices } from "@/utils/vocabulary-hunter/assessment"
 import {
@@ -454,7 +455,6 @@ async function start(ctx: ContentScriptContext) {
     return vocabularyDictionary
   }
 
-  if (state.enabled) await ensureVocabularyDictionary()
   let trackedRanges: TrackedRange[] = []
   const rangesByTextNode = new Map<Text, TrackedRange[]>()
   let selected: TrackedRange | null = null
@@ -1238,13 +1238,20 @@ async function start(ctx: ContentScriptContext) {
   })
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
 
-  void refresh()
+  let cancelInitialRefresh: (() => void) | undefined = scheduleIdleTask(() => {
+    cancelInitialRefresh = undefined
+    void refresh()
+  })
   const unwatchState = watchVocabularyHunterState((nextState) => {
     const requiresRefresh = shouldRefreshVocabularyHighlights(state, nextState)
     state = nextState
     highlightStyles.update(state)
     applyDictionaryOrder()
-    if (requiresRefresh) void refresh()
+    if (requiresRefresh) {
+      cancelInitialRefresh?.()
+      cancelInitialRefresh = undefined
+      void refresh()
+    }
   })
 
   ctx.onInvalidated(() => {
@@ -1253,6 +1260,7 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hoverTimer)
     clearTimeout(gistSyncTimer)
     clearTimeout(toastTimer)
+    cancelInitialRefresh?.()
     if (mouseMoveFrame !== undefined) cancelAnimationFrame(mouseMoveFrame)
     observer.disconnect()
     cardResizeObserver.disconnect()
