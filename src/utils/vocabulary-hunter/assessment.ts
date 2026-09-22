@@ -78,6 +78,32 @@ const WORD_BANK = [
 const PSEUDOWORDS = ["flinterous", "brastify", "morbical", "trellic", "dovinate", "pransive"]
 export const LEGACY_ASSESSMENT_WORDS = [...WORD_BANK, ...PSEUDOWORDS]
 
+interface UniqueVocabularyLemma {
+  index: number
+  lemma: string
+  level: VocabularyLevel
+}
+
+const UNIQUE_LEMMAS_CACHE = new WeakMap<
+  Map<string, VocabularyWordInfo>,
+  readonly UniqueVocabularyLemma[]
+>()
+
+function getUniqueVocabularyLemmas(dictionary: Map<string, VocabularyWordInfo>) {
+  const cached = UNIQUE_LEMMAS_CACHE.get(dictionary)
+  if (cached) return cached
+
+  const byIndex = new Map<number, UniqueVocabularyLemma>()
+  dictionary.forEach((info) => {
+    if (!byIndex.has(info.index)) {
+      byIndex.set(info.index, { index: info.index, lemma: info.lemma, level: info.level })
+    }
+  })
+  const lemmas = [...byIndex.values()].sort((left, right) => left.index - right.index)
+  UNIQUE_LEMMAS_CACHE.set(dictionary, lemmas)
+  return lemmas
+}
+
 function hash(seed: number) {
   let value = seed | 0
   return () => {
@@ -233,10 +259,8 @@ export function estimateVocabularySize(
   probabilities: Record<VocabularyLevel, number>,
   statuses: Record<string, VocabularyStatus> = {},
 ) {
-  const lemmas = new Map<number, { lemma: string; level: VocabularyLevel }>()
-  dictionary.forEach((info) => lemmas.set(info.index, { lemma: info.lemma, level: info.level }))
   const statusScore: Record<VocabularyStatus, number> = { known: 1, fuzzy: 0.5, unknown: 0 }
-  const estimate = [...lemmas.values()].reduce((sum, { lemma, level }) => {
+  const estimate = getUniqueVocabularyLemmas(dictionary).reduce((sum, { lemma, level }) => {
     const status = statuses[lemma]
     const probability = Number.isFinite(probabilities[level]) ? probabilities[level] : 0
     const explicitScore = status === undefined ? undefined : statusScore[status]
@@ -250,11 +274,8 @@ export function countExplicitVocabularyStatuses(
   statuses: Record<string, VocabularyStatus>,
 ) {
   const counts: Record<VocabularyStatus, number> = { known: 0, fuzzy: 0, unknown: 0 }
-  const seen = new Set<number>()
-  dictionary.forEach((info) => {
-    if (seen.has(info.index)) return
-    seen.add(info.index)
-    const status = statuses[info.lemma]
+  getUniqueVocabularyLemmas(dictionary).forEach(({ lemma }) => {
+    const status = statuses[lemma]
     if (status && Number.isFinite(counts[status])) counts[status] += 1
   })
   return counts
@@ -279,15 +300,13 @@ export function createPredictedKnownIndices(
   const predicted = new Set<number>()
   if (!assessment || assessment.confidence < 0.5) return predicted
 
-  const lemmas = new Map<number, string>()
-  dictionary.forEach((info) => lemmas.set(info.index, info.lemma))
   const targetCount = estimateVocabularySize(dictionary, assessment.probabilities, statuses)
-  const orderedLemmas = [...lemmas.entries()].sort(([left], [right]) => left - right)
+  const orderedLemmas = getUniqueVocabularyLemmas(dictionary)
 
-  orderedLemmas.forEach(([index, lemma]) => {
+  orderedLemmas.forEach(({ index, lemma }) => {
     if (statuses[lemma] === "known") predicted.add(index)
   })
-  for (const [index, lemma] of orderedLemmas) {
+  for (const { index, lemma } of orderedLemmas) {
     if (predicted.size >= targetCount) break
     if (statuses[lemma] === "unknown" || statuses[lemma] === "fuzzy") continue
     predicted.add(index)

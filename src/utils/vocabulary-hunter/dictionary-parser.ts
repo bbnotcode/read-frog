@@ -18,6 +18,7 @@ export async function parseVocabularyDictionary(
 ) {
   const dictionary = new Map<string, VocabularyWordInfo>()
   const lemmaIndices = new Map<string, number>()
+  const sharedInfo = new Map<string, VocabularyWordInfo>()
   let lineStart = 0
   let parsedLines = 0
 
@@ -37,7 +38,13 @@ export async function parseVocabularyDictionary(
           index = lemmaIndices.size
           lemmaIndices.set(lemma, index)
         }
-        dictionary.set(word, { lemma, level: level as VocabularyLevel, index })
+        const infoKey = `${lemma}\0${level}`
+        let info = sharedInfo.get(infoKey)
+        if (!info) {
+          info = { lemma, level: level as VocabularyLevel, index }
+          sharedInfo.set(infoKey, info)
+        }
+        dictionary.set(word, info)
       }
     }
 
