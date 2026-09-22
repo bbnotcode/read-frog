@@ -68,4 +68,22 @@ describe("backgroundFetch", () => {
     expect(response.headers.get("content-type")).toBe("image/webp")
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([0, 1, 2, 3])
   })
+
+  it("preserves the proxy's authenticated default when credentials are not specified", async () => {
+    sendMessageMock.mockResolvedValue({
+      status: 200,
+      statusText: "OK",
+      headers: [],
+      body: "",
+      bodyEncoding: "text",
+    })
+
+    const { backgroundFetch } = await import("../background-fetch-client")
+    await backgroundFetch("https://example.com/account")
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      "backgroundFetch",
+      expect.objectContaining({ credentials: undefined }),
+    )
+  })
 })

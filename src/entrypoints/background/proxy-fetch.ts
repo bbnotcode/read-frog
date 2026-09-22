@@ -160,11 +160,12 @@ export function proxyFetch() {
     if (allowedHosts?.length && !allowedHosts.includes(targetUrl.hostname)) {
       throw new Error("Proxy URL host is not allowed")
     }
-    const safeTimeoutMs = Math.min(Math.max(timeoutMs ?? 30_000, 1_000), 60_000)
-    const safeMaxResponseBytes = Math.min(
-      Math.max(maxResponseBytes ?? 10 * 1024 * 1024, 1_024),
-      25 * 1024 * 1024,
-    )
+    const safeTimeoutMs =
+      timeoutMs === undefined ? undefined : Math.min(Math.max(timeoutMs, 1_000), 60_000)
+    const safeMaxResponseBytes =
+      maxResponseBytes === undefined
+        ? undefined
+        : Math.min(Math.max(maxResponseBytes, 1_024), 25 * 1024 * 1024)
 
     const {
       enabled: cacheEnabled = false,
@@ -216,26 +217,33 @@ export function proxyFetch() {
       await invalidateCache(cacheGroupKey)
     }
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), safeTimeoutMs)
+    const controller = safeTimeoutMs === undefined ? undefined : new AbortController()
+    const timeout =
+      controller && safeTimeoutMs !== undefined
+        ? setTimeout(() => controller.abort(), safeTimeoutMs)
+        : undefined
     let response: Response
     try {
       response = await fetch(url, {
         method: finalMethod,
         headers: headers ? new Headers(headers) : undefined,
         body,
-        credentials: credentials ?? "omit",
+        credentials: credentials ?? "include",
         redirect,
-        signal: controller.signal,
+        signal: controller?.signal,
       })
     } catch (error) {
-      clearTimeout(timeout)
+      if (timeout !== undefined) clearTimeout(timeout)
       throw error
     }
 
     const declaredLength = Number(response.headers.get("content-length") ?? 0)
-    if (Number.isFinite(declaredLength) && declaredLength > safeMaxResponseBytes) {
-      clearTimeout(timeout)
+    if (
+      safeMaxResponseBytes !== undefined &&
+      Number.isFinite(declaredLength) &&
+      declaredLength > safeMaxResponseBytes
+    ) {
+      if (timeout !== undefined) clearTimeout(timeout)
       throw new Error("Proxy response is too large")
     }
 
@@ -247,13 +255,15 @@ export function proxyFetch() {
           ? encodeArrayBufferToBase64(await response.arrayBuffer())
           : await response.text()
     } finally {
-      clearTimeout(timeout)
+      if (timeout !== undefined) clearTimeout(timeout)
     }
     const responseBytes =
       responseType === "base64"
         ? Math.ceil((responseBody.length * 3) / 4)
         : new TextEncoder().encode(responseBody).byteLength
-    if (responseBytes > safeMaxResponseBytes) throw new Error("Proxy response is too large")
+    if (safeMaxResponseBytes !== undefined && responseBytes > safeMaxResponseBytes) {
+      throw new Error("Proxy response is too large")
+    }
 
     const result = {
       status: response.status,

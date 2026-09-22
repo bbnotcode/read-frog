@@ -2,4 +2,4 @@
 "read-frog": patch
 ---
 
-Defer Vocabulary Hunter startup work and avoid mounting disabled floating-button UI.
+Defer Vocabulary Hunter startup work while keeping dynamic page scans consistent.

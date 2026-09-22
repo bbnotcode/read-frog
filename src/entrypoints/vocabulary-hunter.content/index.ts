@@ -863,6 +863,8 @@ async function start(ctx: ContentScriptContext) {
     }
     isProcessingPendingTextNodes = true
     try {
+      await ensureVocabularyDictionary()
+      if (!state.enabled) return
       do {
         removeDisconnectedRanges()
         const nodes = [...pendingTextNodes]

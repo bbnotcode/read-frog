@@ -22,7 +22,6 @@ import { insertShadowRootUIWrapperInto, OVERLAY_SHADOW_ROOT_CSS } from "@/utils/
 import { isSiteEnabled } from "@/utils/site-control"
 import { queryClient } from "@/utils/tanstack-query"
 import { getLocalThemeMode } from "@/utils/theme"
-import { urlMatchesPattern } from "@/utils/url-pattern"
 import { mirrorDynamicStyles, protectInternalStyles } from "../../utils/styles"
 import App from "./app"
 import { store } from "./atoms"
@@ -57,15 +56,6 @@ export default defineContentScript({
 
     // Check global site control
     if (!isSiteEnabled(window.location.href, config)) {
-      return
-    }
-
-    if (
-      !config.floatingButton.enabled ||
-      config.floatingButton.disabledFloatingButtonPatterns.some((pattern) =>
-        urlMatchesPattern(window.location.href, pattern),
-      )
-    ) {
       return
     }
 

@@ -85,7 +85,7 @@ function buildProxyRequest(
     method: getRequestMethod(input, init),
     headers: getRequestHeaders(input, init),
     body: getRequestBody(init),
-    credentials: options?.credentials ?? "omit",
+    credentials: options?.credentials,
     cacheConfig: options?.cacheConfig,
     responseType: options?.responseType ?? "text",
   }
