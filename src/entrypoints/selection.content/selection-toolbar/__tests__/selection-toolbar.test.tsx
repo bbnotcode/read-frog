@@ -22,10 +22,15 @@ vi.mock("../translate-button", () => ({
 
 vi.mock("../speak-button", () => ({
   SpeakButton: () => null,
+  SelectionSpeechProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-vi.mock("../custom-action-button", () => ({
-  SelectionToolbarCustomActionButtons: () => null,
+vi.mock("../pinned-items", () => ({
+  SelectionToolbarPinnedItems: () => null,
+}))
+
+vi.mock("../more-menu", () => ({
+  SelectionToolbarMoreMenu: () => <button type="button" data-testid="more-menu" />,
 }))
 
 // Mock atoms
@@ -226,7 +231,7 @@ describe("selectionToolbar - isInputOrTextarea logic", () => {
     expect(getOverlayRoot()).not.toHaveClass("inset-0")
   })
 
-  it("keeps the overlay root collapsed when no toolbar feature is enabled", async () => {
+  it("keeps the overlay root collapsed when no toolbar item is enabled", async () => {
     await store.set(configFieldsAtomMap.selectionToolbar, {
       ...DEFAULT_SELECTION_TOOLBAR_CONFIG,
       features: {
@@ -238,6 +243,14 @@ describe("selectionToolbar - isInputOrTextarea logic", () => {
       },
       builtInActions: {
         dictionary: {
+          enabled: false,
+          providerId: "google-translate-default",
+        },
+        sentenceAnalysis: {
+          enabled: false,
+          providerId: "google-translate-default",
+        },
+        improveWriting: {
           enabled: false,
           providerId: "google-translate-default",
         },
@@ -255,6 +268,27 @@ describe("selectionToolbar - isInputOrTextarea logic", () => {
 
     expect(getOverlayRoot()).toHaveClass("h-0", "w-0")
     expect(getOverlayRoot()).not.toHaveClass("inset-0")
+  })
+
+  it("shows the toolbar with just its more menu when no enabled item is pinned", async () => {
+    await store.set(configFieldsAtomMap.selectionToolbar, {
+      ...DEFAULT_SELECTION_TOOLBAR_CONFIG,
+      unpinned: ["translate", "speak", "default-dictionary", "default-sentence-analysis"],
+    })
+    render(
+      <div>
+        <SelectionToolbar />
+        <div data-testid="test-element">{MOCK_SELECTED_TEXT}</div>
+      </div>,
+    )
+
+    await triggerMouseUpWithSelection(screen.getByTestId("test-element"))
+
+    await waitFor(() => {
+      expect(getOverlayRoot()).toHaveClass("inset-0")
+    })
+    expectToolbarVisible()
+    expect(screen.getByTestId("more-menu")).toBeInTheDocument()
   })
 
   it("should show toolbar when selecting text in a normal div element", async () => {
@@ -584,6 +618,49 @@ describe("selectionToolbar - isInputOrTextarea logic", () => {
 
     await triggerMouseUpWithSelection(overlayTextElement)
     expectToolbarHidden()
+  })
+
+  it("should not show toolbar when the selection is inside a shadow root nested in the overlay", async () => {
+    // Production shape: the toolbar and popover live in the extension's shadow
+    // root, and a custom action layout renders in its own shadow root inside it.
+    const extensionHost = document.createElement("read-frog-selection")
+    const extensionRoot = extensionHost.attachShadow({ mode: "open" })
+    const mount = document.createElement("div")
+    const layoutHost = document.createElement("div")
+    extensionRoot.append(mount, layoutHost)
+    const layoutRoot = layoutHost.attachShadow({ mode: "open" })
+    const layoutText = document.createElement("span")
+    layoutText.textContent = MOCK_SELECTED_TEXT
+    layoutRoot.append(layoutText)
+    const pageElement = document.createElement("p")
+    pageElement.textContent = "Page text"
+    document.body.append(extensionHost, pageElement)
+
+    render(<SelectionToolbar />, { container: mount })
+    await clearToolbarState()
+
+    const textNode = layoutText.firstChild
+    if (!textNode) {
+      throw new Error("Missing layout text node")
+    }
+
+    window.getSelection = vi.fn<(...args: any[]) => any>(() => ({
+      anchorNode: textNode,
+      focusNode: textNode,
+      rangeCount: 1,
+      toString: vi.fn<(...args: any[]) => any>(() => MOCK_SELECTED_TEXT),
+      getRangeAt: () => ({
+        startContainer: textNode,
+        startOffset: 0,
+        endContainer: textNode,
+        endOffset: MOCK_SELECTED_TEXT.length,
+      }),
+      containsNode: vi.fn<(...args: any[]) => any>(() => true),
+    }))
+
+    await triggerMouseUpWithSelection(pageElement)
+
+    expect(extensionRoot.querySelector(".absolute.z-2147483647")).toHaveClass("opacity-0")
   })
 
   it("should show toolbar when selection contains the click target", async () => {

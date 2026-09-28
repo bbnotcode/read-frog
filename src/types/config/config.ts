@@ -1,5 +1,10 @@
 import { langCodeISO6393Schema, langLevel } from "@read-frog/definitions"
 import { z } from "zod"
+import {
+  BUILT_IN_ACTION_IDS,
+  BUILT_IN_ACTION_KEYS,
+  isBuiltInActionId,
+} from "@/utils/constants/custom-action"
 import { FEATURE_KEYS, FEATURE_PROVIDER_DEFS } from "@/utils/constants/feature-providers"
 import {
   MAX_SELECTION_OVERLAY_OPACITY,
@@ -11,6 +16,7 @@ import {
   doesProviderSupportsCapability,
   getProviderIdsForCapability,
 } from "@/utils/providers/provider-registry"
+import { normalizeSelectionToolbarLists } from "@/utils/selection-toolbar-order"
 import { floatingButtonSchema } from "./floating-button"
 import { glossaryConfigSchema } from "./glossary"
 import { languageDetectionConfigSchema } from "./language-detection"
@@ -52,6 +58,15 @@ const selectionToolbarSchema = z
     }),
     builtInActions: selectionToolbarBuiltInActionsSchema,
     customActions: selectionToolbarCustomActionsSchema,
+    // The order of every toolbar item (translate, speak and the actions), by
+    // id. Kept in step with the items by the transform below. `.default([])`
+    // lets a config stored before this field parse in UI contexts that load
+    // ahead of the background migration.
+    order: z.array(z.string().min(1)).default([]),
+    // Ids of the items kept off the toolbar itself, in its "more" menu only.
+    // Every other item is pinned. Independent of an item's enabled switch,
+    // so a pin survives the item being turned off and on.
+    unpinned: z.array(z.string().min(1)).default([]),
     noteSuggestion: z.object({
       enabled: z.boolean(),
       actionId: z.string().nonempty(),
@@ -61,7 +76,7 @@ const selectionToolbarSchema = z
   .superRefine((selectionToolbar, ctx) => {
     const actionId = selectionToolbar.noteSuggestion.actionId
     const actionExists =
-      actionId === "default-dictionary" ||
+      isBuiltInActionId(actionId) ||
       selectionToolbar.customActions.some((action) => action.id === actionId)
 
     if (!actionExists) {
@@ -72,6 +87,9 @@ const selectionToolbarSchema = z
       })
     }
   })
+  // Every parse brings `order` and `unpinned` in step with the actions there
+  // are, so adding or deleting an action never has to update them itself.
+  .transform((selectionToolbar) => normalizeSelectionToolbarLists(selectionToolbar))
 
 // side content schema
 const sideContentSchema = z.object({
@@ -221,10 +239,13 @@ export const configSchema = z
     }
 
     const actionProviderEntries = [
-      {
-        providerId: data.selectionToolbar.builtInActions.dictionary.providerId,
-        path: ["selectionToolbar", "builtInActions", "dictionary", "providerId"] as const,
-      },
+      ...BUILT_IN_ACTION_IDS.map((id) => {
+        const key = BUILT_IN_ACTION_KEYS[id]
+        return {
+          providerId: data.selectionToolbar.builtInActions[key].providerId,
+          path: ["selectionToolbar", "builtInActions", key, "providerId"] as const,
+        }
+      }),
       ...data.selectionToolbar.customActions.map((action, index) => ({
         providerId: action.providerId,
         path: ["selectionToolbar", "customActions", index, "providerId"] as const,

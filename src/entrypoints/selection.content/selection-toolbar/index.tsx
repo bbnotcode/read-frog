@@ -16,14 +16,15 @@ import {
   EXTERNAL_SELECTION_OPEN_EVENT,
   MARGIN,
 } from "@/utils/constants/selection"
-import { getSelectionToolbarActions } from "@/utils/custom-actions"
+import { getSelectionToolbarItems } from "@/utils/selection-toolbar-items"
 import { cn } from "@/utils/styles/utils"
 import { urlMatchesPattern } from "@/utils/url-pattern"
 import { buildContextSnapshot, readSelectionSnapshot } from "../utils"
 import { clearSelectionStateAtom, isSelectionToolbarOpenAtom, setSelectionStateAtom } from "./atoms"
 import { CloseButton, DropEvent } from "./close-button"
-import { SelectionToolbarCustomActionButtons } from "./custom-action-button"
 import { createModalDialogHostController } from "./modal-dialog-host"
+import { SelectionToolbarMoreMenu } from "./more-menu"
+import { SelectionToolbarPinnedItems } from "./pinned-items"
 import {
   collectSelectionScrollTargets,
   createSelectionAnchorTracker,
@@ -34,8 +35,7 @@ import {
   SelectionDirection,
   viewportPointToHostPoint,
 } from "./positioning"
-import { SpeakButton } from "./speak-button"
-import { TranslateButton } from "./translate-button"
+import { SelectionSpeechProvider } from "./speak-button"
 
 const EXTERNAL_SELECTION_DIRECTION_MAP: Record<EbookBridgeSelectionDirection, SelectionDirection> =
   {
@@ -107,15 +107,11 @@ function getNearestSelectionOverlayElement(node: Node | null) {
   return null
 }
 
-function isNodeInsideSelectionOverlay(
-  node: Node | null,
+function isNodeDirectlyInsideSelectionOverlay(
+  node: Node,
   overlayContainer: HTMLElement | null,
   overlayShadowRoot: ShadowRoot | null,
 ) {
-  if (!node) {
-    return false
-  }
-
   if (overlayContainer?.contains(node)) {
     return true
   }
@@ -130,6 +126,27 @@ function isNodeInsideSelectionOverlay(
   }
 
   return node === overlayShadowRoot || node.getRootNode() === overlayShadowRoot
+}
+
+function isNodeInsideSelectionOverlay(
+  node: Node | null,
+  overlayContainer: HTMLElement | null,
+  overlayShadowRoot: ShadowRoot | null,
+) {
+  // A shadow root nested inside the overlay (a custom action's layout renders
+  // in one) hides its nodes from `contains`, `closest` and the root check, so
+  // each enclosing shadow host is checked in turn.
+  let current = node
+  while (current) {
+    if (isNodeDirectlyInsideSelectionOverlay(current, overlayContainer, overlayShadowRoot)) {
+      return true
+    }
+
+    const root = current.getRootNode()
+    current = root instanceof ShadowRoot ? root.host : null
+  }
+
+  return false
 }
 
 function collectSelectionBoundaryNodes(selection: Selection) {
@@ -211,13 +228,11 @@ export function SelectionToolbar() {
   const isSiteDisabled = selectionToolbar.disabledSelectionToolbarPatterns?.some((pattern) =>
     urlMatchesPattern(window.location.href, pattern),
   )
-  const { features } = selectionToolbar
-  const hasAnyEnabledFeature =
-    features.translate.enabled ||
-    features.speak.enabled ||
-    getSelectionToolbarActions(selectionToolbar).some((action) => action.enabled !== false)
+  // With nothing pinned the toolbar still shows its "more" menu; with nothing
+  // enabled there is nothing to show.
+  const hasAnyEnabledItem = getSelectionToolbarItems(selectionToolbar).some((item) => item.enabled)
   const isSelectionToolbarVisible =
-    isSelectionToolbarOpen && selectionToolbar.enabled && !isSiteDisabled && hasAnyEnabledFeature
+    isSelectionToolbarOpen && selectionToolbar.enabled && !isSiteDisabled && hasAnyEnabledItem
   const dropdownOpenRef = useRef(false)
   // Bumped per external (ebook bridge) selection so the position is re-applied
   // even when the toolbar is already visible (visibility doesn't flip then).
@@ -582,7 +597,7 @@ export function SelectionToolbar() {
       )}
       {...{ [SELECTION_CONTENT_OVERLAY_ROOT_ATTRIBUTE]: "" }}
     >
-      {selectionToolbar.enabled && !isSiteDisabled && hasAnyEnabledFeature && (
+      {selectionToolbar.enabled && !isSiteDisabled && hasAnyEnabledItem && (
         <div
           ref={tooltipRef}
           inert={!isSelectionToolbarVisible}
@@ -593,18 +608,19 @@ export function SelectionToolbar() {
               : "pointer-events-none opacity-0",
           )}
         >
-          <div
-            data-slot="selection-toolbar-surface"
-            className="flex items-center rounded-sm border border-border/50 bg-popover shadow-(--rf-elevation-floating)"
-            style={{ opacity: "var(--rf-selection-opacity, 1)" }}
-          >
-            <div className="no-scrollbar flex max-w-105 items-center overflow-x-auto overflow-y-hidden rounded-sm">
-              {features.translate.enabled && <TranslateButton />}
-              {features.speak.enabled && <SpeakButton />}
-              <SelectionToolbarCustomActionButtons />
+          <SelectionSpeechProvider>
+            <div
+              data-slot="selection-toolbar-surface"
+              className="flex items-center rounded-sm border border-border/50 bg-popover shadow-(--rf-elevation-floating)"
+              style={{ opacity: "var(--rf-selection-opacity, 1)" }}
+            >
+              <div className="no-scrollbar flex max-w-105 items-center overflow-x-auto overflow-y-hidden rounded-sm">
+                <SelectionToolbarPinnedItems />
+              </div>
+              <SelectionToolbarMoreMenu />
+              <CloseButton />
             </div>
-            <CloseButton />
-          </div>
+          </SelectionSpeechProvider>
         </div>
       )}
     </div>

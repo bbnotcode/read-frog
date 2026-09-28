@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { DEFAULT_CONFIG } from "@/utils/constants/config"
 import {
   duplicateSelectionToolbarAction,
+  findSelectionToolbarAction,
   getBuiltInDictionaryAction,
   getSelectionToolbarActions,
   replaceSelectionToolbarAction,
@@ -13,7 +14,7 @@ function cloneSelectionToolbar() {
 }
 
 describe("selection toolbar built-in actions", () => {
-  it("always resolves Dictionary before custom actions", () => {
+  it("always resolves the built-in actions before custom actions", () => {
     const selectionToolbar = cloneSelectionToolbar()
     const dictionary = getBuiltInDictionaryAction(selectionToolbar)
     selectionToolbar.customActions = [
@@ -26,8 +27,87 @@ describe("selection toolbar built-in actions", () => {
 
     expect(getSelectionToolbarActions(selectionToolbar).map((action) => action.id)).toEqual([
       "default-dictionary",
+      "default-sentence-analysis",
+      "default-improve-writing",
       "custom-action",
     ])
+  })
+
+  it("resolves the built-in Sentence Analysis from its stored state", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    selectionToolbar.builtInActions.sentenceAnalysis = {
+      enabled: false,
+      providerId: "openai-default",
+    }
+
+    const action = findSelectionToolbarAction(selectionToolbar, "default-sentence-analysis")
+    expect(action).toMatchObject({
+      id: "default-sentence-analysis",
+      enabled: false,
+      providerId: "openai-default",
+      icon: "streamline-color:search-visual-flat",
+    })
+    expect(action?.outputSchema.map((field) => field.id)).toEqual([
+      "default-sentence-analysis-annotations",
+      "default-sentence-analysis-translation",
+    ])
+    expect(action?.layout).toContain("default-sentence-analysis-annotations")
+  })
+
+  it("resolves the built-in Improve Writing, on by default, from its stored state", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    const action = findSelectionToolbarAction(selectionToolbar, "default-improve-writing")
+    expect(action).toMatchObject({
+      id: "default-improve-writing",
+      enabled: true,
+      providerId: DEFAULT_CONFIG.selectionToolbar.builtInActions.improveWriting.providerId,
+      icon: "streamline-color:ai-edit-spark-flat",
+    })
+    expect(action?.outputSchema.map((field) => field.id)).toEqual([
+      "default-improve-writing-setting",
+      "default-improve-writing-annotations",
+      "default-improve-writing-improved",
+      "default-improve-writing-summary",
+    ])
+    expect(action?.layout).toContain("default-improve-writing-annotations")
+
+    selectionToolbar.builtInActions.improveWriting = {
+      enabled: false,
+      providerId: "openai-default",
+    }
+    expect(findSelectionToolbarAction(selectionToolbar, "default-improve-writing")).toMatchObject({
+      enabled: false,
+      providerId: "openai-default",
+    })
+  })
+
+  it("persists only mutable state when replacing the built-in Sentence Analysis", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    const action = findSelectionToolbarAction(selectionToolbar, "default-sentence-analysis")!
+
+    const next = replaceSelectionToolbarAction(selectionToolbar, {
+      ...action,
+      name: "Renamed",
+      systemPrompt: "Changed",
+      providerId: "openai-default",
+      enabled: false,
+    })
+
+    expect(next.builtInActions).toEqual({
+      dictionary: selectionToolbar.builtInActions.dictionary,
+      sentenceAnalysis: {
+        enabled: false,
+        providerId: "openai-default",
+        notebaseConnection: undefined,
+      },
+      improveWriting: selectionToolbar.builtInActions.improveWriting,
+    })
+    expect(next.customActions).toBe(selectionToolbar.customActions)
+    expect(findSelectionToolbarAction(next, "default-sentence-analysis")).toMatchObject({
+      name: action.name,
+      systemPrompt: action.systemPrompt,
+      providerId: "openai-default",
+    })
   })
 
   it("persists only mutable state when replacing the built-in Dictionary", () => {
@@ -68,6 +148,48 @@ describe("selection toolbar built-in actions", () => {
       notebaseConnection: connection,
     })
     expect(next.customActions).toEqual([])
+  })
+
+  it("never persists the built-in Dictionary's layout", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    const dictionary = getBuiltInDictionaryAction(selectionToolbar)
+    expect(dictionary.layout).toEqual(expect.any(String))
+
+    const next = replaceSelectionToolbarAction(selectionToolbar, {
+      ...dictionary,
+      layout: "<p>Attempted layout edit</p>",
+    })
+
+    expect(next.builtInActions.dictionary).not.toHaveProperty("layout")
+    expect(getBuiltInDictionaryAction(next).layout).toBe(dictionary.layout)
+    expect(next.customActions).toEqual([])
+  })
+
+  it("stores a custom action's layout as given", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    const custom = {
+      ...getBuiltInDictionaryAction(selectionToolbar),
+      id: "custom-action",
+      name: "Custom",
+      layout: "<p>{{ Before }}</p>",
+    }
+    selectionToolbar.customActions = [custom]
+
+    const next = replaceSelectionToolbarAction(selectionToolbar, {
+      ...custom,
+      layout: "<p>{{ After }}</p>",
+    })
+
+    expect(next.customActions[0]?.layout).toBe("<p>{{ After }}</p>")
+  })
+
+  it("copies the layout when duplicating", () => {
+    const selectionToolbar = cloneSelectionToolbar()
+    const dictionary = getBuiltInDictionaryAction(selectionToolbar)
+    const custom = { ...dictionary, id: "custom-action", name: "Custom", layout: "<p>mine</p>" }
+
+    expect(duplicateSelectionToolbarAction(dictionary, [dictionary]).layout).toBe(dictionary.layout)
+    expect(duplicateSelectionToolbarAction(custom, [dictionary, custom]).layout).toBe("<p>mine</p>")
   })
 
   it("deep-copies enabled, provider, and the full connection into an editable action", () => {
