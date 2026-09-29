@@ -643,7 +643,7 @@ options:
       providerUnavailable: 選択したプロバイダーは利用できません
     customActions:
       title: カスタム AI アクション
-      pageDescription: 独自のプロンプトを作成し、選択ツールバーから選択したテキストに対して実行します。
+      pageDescription: 独自のプロンプトを作成し、選択ツールバーから選択したテキストに対して実行します。生成結果のデータ、スタイル、インタラクションはすべてカスタマイズできます。
       description: 選択テキスト向けに独自の構造化 AI アクションを追加
       configTitle: アクション設定
       builtIn: 組み込み
@@ -723,8 +723,10 @@ options:
           replay: 再生
           sampleData: サンプルデータ
           sampleDataHint: このプレビューでのみ使われ、保存されません。
+          sampleDataSavedHint: このプレビューでのみ使われ、このアクションと一緒に保存されます。
           sampleDataReset: サンプルをリセット
-          sampleValue: $1のサンプル
+          sampleSelection: 選択したテキスト
+          sampleTargetLanguage: 翻訳先の言語
           insertField: フィールド
           insertSpeak: 読み上げボタン
           insertCondition: 値があるとき
@@ -1469,6 +1471,9 @@ options:
           description: すべてのキャッシュされたAI区切り結果が削除されます。次回AI区切りを有効にして動画を再生すると、字幕が再処理されます。
   whatsNew:
     title: 新機能
+    postType:
+      promotion: キャンペーン
+      update: アップデート
   rateUs:
     title: レビューを書く
   configMigration:
@@ -1510,6 +1515,8 @@ translation:
   autoModeSameLanguage: 検出された言語 '$1' はターゲット言語と同じです
   extensionContextInvalidated: 拡張機能が更新されました。このページを再読み込みしてからもう一度お試しください。
 speak:
+  languageDetectionFallback: ローカルの言語検出に切り替えました
+  languageDetectionSettingsHint: 設定で利用可能なLLMに変更するか、ローカル検出を選んでください。
   fetchingAudio: 音声を生成しています...
   playingAudio: 音声を再生しています...
   failedToGenerateSpeech: 音声生成に失敗しました
@@ -1562,6 +1569,7 @@ action:
   pinToToolbar: ツールバーに固定
   unpinFromToolbar: ツールバーから固定解除
   dragToReorder: ドラッグして並べ替え
+  addCustomAction: カスタム AI アクションを追加
 noteSuggestion:
   title: 保存におすすめ
   description: Notebase に保存したい単語を選んで、いつでも復習できます。
