@@ -298,7 +298,7 @@ function SelectionPopoverTrigger({
       {
         type: "button",
         className: cn(
-          "flex h-7 shrink-0 cursor-pointer items-center justify-center px-2 hover:bg-accent",
+          "flex h-7 shrink-0 cursor-pointer items-center justify-center px-2 hover:bg-muted",
           className,
         ),
         children,
@@ -578,7 +578,7 @@ function SelectionPopoverBody({
     defaultTagName: "div",
     props: mergeProps<"div">(
       {
-        className: cn("min-h-0 flex-1 overflow-y-auto", className),
+        className: cn("min-h-0 flex-1 overflow-y-auto scroll-driven:scroll-fade", className),
       },
       props,
     ),
