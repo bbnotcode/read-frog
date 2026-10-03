@@ -3,13 +3,28 @@ import type { SelectionSession } from "../atoms"
 import type { SelectionPopoverActions } from "@/components/ui/selection-popover"
 import { useAtomValue, useSetAtom } from "jotai"
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { CustomActionContent } from "@/components/custom-action/custom-action-content"
+import { CustomActionToolButton } from "@/components/custom-action/custom-action-tool-button"
+import { SaveToNotebaseButton } from "@/components/custom-action/save-to-notebase-button"
+import { isSaveToNotebaseDialogOpenAtom } from "@/components/custom-action/save-to-notebase-dialog-atom"
+import { SaveToNotebaseDialogHost } from "@/components/custom-action/save-to-notebase-dialog-host"
+import {
+  buildCustomActionExecutionPlan,
+  useCustomActionExecution,
+  useCustomActionWebPageContext,
+} from "@/components/custom-action/use-custom-action-execution"
 import { useHostedAiProviderOptions } from "@/components/llm-providers/use-hosted-ai-provider-options"
 import { toastManager } from "@/components/ui/base-ui/toast"
 import { SelectionPopover } from "@/components/ui/selection-popover"
+import { createSelectionToolbarPrecheckError } from "@/components/ui/selection-popover/inline-error"
+import { SelectionToolbarErrorAlert } from "@/components/ui/selection-popover/selection-toolbar-error-alert"
+import { SelectionToolbarFooterContent } from "@/components/ui/selection-popover/selection-toolbar-footer-content"
+import { SelectionToolbarTitleContent } from "@/components/ui/selection-popover/selection-toolbar-title-content"
 import { ANALYTICS_FEATURE, ANALYTICS_SURFACE } from "@/types/analytics"
 import { createFeatureUsageContext, trackFeatureUsed } from "@/utils/analytics"
 import { classifyResolvedProvider, UNKNOWN_FEATURE_PROVIDER } from "@/utils/analytics-provider"
 import { configFieldsAtomMap, writeConfigAtom } from "@/utils/atoms/config"
+import { getSourceDocumentTitle } from "@/utils/content/document-title"
 import { findSelectionToolbarAction, patchSelectionToolbarAction } from "@/utils/custom-actions"
 import { onMessage } from "@/utils/message"
 import {
@@ -17,9 +32,6 @@ import {
   resolveProviderRefForCapability,
 } from "@/utils/providers/provider-registry"
 import { shadowWrapper } from "../.."
-import { SelectionToolbarErrorAlert } from "../../components/selection-toolbar-error-alert"
-import { SelectionToolbarFooterContent } from "../../components/selection-toolbar-footer-content"
-import { SelectionToolbarTitleContent } from "../../components/selection-toolbar-title-content"
 import { normalizeSelectedText } from "../../utils"
 import {
   contextAtom,
@@ -32,18 +44,7 @@ import {
   OPEN_EXTERNAL_CUSTOM_ACTION_EVENT,
   publishExternalSelectionCustomActionResult,
 } from "../external-custom-action-source"
-import { createSelectionToolbarPrecheckError } from "../inline-error"
 import { useSelectionOpenRequestResolver } from "../use-selection-open-request"
-import { CustomActionContent } from "./custom-action-content"
-import { CustomActionToolButton } from "./custom-action-tool-button"
-import { SaveToNotebaseButton } from "./save-to-notebase-button"
-import { isSaveToNotebaseDialogOpenAtom } from "./save-to-notebase-dialog-atom"
-import { SaveToNotebaseDialogHost } from "./save-to-notebase-dialog-host"
-import {
-  buildCustomActionExecutionPlan,
-  useCustomActionExecution,
-  useCustomActionWebPageContext,
-} from "./use-custom-action-execution"
 
 interface SelectionCustomActionPendingOpenRequest {
   actionId: string
@@ -204,7 +205,7 @@ export function SelectionCustomActionProvider({ children }: { children: ReactNod
     return activeSession?.contextSnapshot.text || cleanSelection
   }, [activeSession?.contextSnapshot.text, cleanSelection])
   const webPageContext = useCustomActionWebPageContext(isOpen, popoverSessionKey)
-  const titleText = (webPageContext?.webTitle ?? document.title) || null
+  const titleText = (webPageContext?.webTitle ?? getSourceDocumentTitle()) || null
   const activeAction = useMemo(() => {
     if (!activeActionId) {
       return null

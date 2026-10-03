@@ -5,8 +5,8 @@ import type {
   SelectionSession,
   SelectionToolbarTranslateRequestSlice,
 } from "../atoms"
-import type { SelectionToolbarInlineError } from "../inline-error"
 import type { SelectionPopoverActions } from "@/components/ui/selection-popover"
+import type { SelectionToolbarInlineError } from "@/components/ui/selection-popover/inline-error"
 import type { BackgroundTextStreamSnapshot, ThinkingSnapshot } from "@/types/background-stream"
 import type { LLMProviderConfig, TranslateProviderConfig } from "@/types/config/provider"
 import type { PromptableProviderRef } from "@/utils/providers/provider-ref"
@@ -24,9 +24,18 @@ import {
   useRef,
   useState,
 } from "react"
+import { isSaveToNotebaseDialogOpenAtom } from "@/components/custom-action/save-to-notebase-dialog-atom"
 import { useHostedAiProviderOptions } from "@/components/llm-providers/use-hosted-ai-provider-options"
 import { toastManager } from "@/components/ui/base-ui/toast"
 import { SelectionPopover } from "@/components/ui/selection-popover"
+import {
+  createSelectionToolbarPrecheckError,
+  createSelectionToolbarRuntimeError,
+  isAbortError,
+} from "@/components/ui/selection-popover/inline-error"
+import { SelectionToolbarErrorAlert } from "@/components/ui/selection-popover/selection-toolbar-error-alert"
+import { SelectionToolbarFooterContent } from "@/components/ui/selection-popover/selection-toolbar-footer-content"
+import { SelectionToolbarTitleContent } from "@/components/ui/selection-popover/selection-toolbar-title-content"
 import { ANALYTICS_FEATURE, ANALYTICS_SURFACE } from "@/types/analytics"
 import { isLLMProviderConfig, isTranslateProviderConfig } from "@/types/config/provider"
 import { createFeatureUsageContext, trackFeatureUsed } from "@/utils/analytics"
@@ -34,6 +43,7 @@ import { classifyProviderConfig, classifyResolvedProvider } from "@/utils/analyt
 import { configFieldsAtomMap, writeConfigAtom } from "@/utils/atoms/config"
 import { buildFeatureProviderPatch } from "@/utils/constants/feature-providers"
 import { streamBackgroundText } from "@/utils/content-script/background-stream-client"
+import { getSourceDocumentTitle } from "@/utils/content/document-title"
 import { getRandomUUID } from "@/utils/crypto-polyfill"
 import { resolveGlossaryTermsFromCache } from "@/utils/glossary/active-matcher"
 import { trackGlossaryUsed } from "@/utils/glossary/analytics"
@@ -53,21 +63,12 @@ import { checkProviderAvailability } from "@/utils/providers/provider-ref"
 import { getSelectableProvidersForCapability } from "@/utils/providers/provider-registry"
 import { getTopLevelReasoning } from "@/utils/providers/reasoning"
 import { shadowWrapper } from "../.."
-import { SelectionToolbarErrorAlert } from "../../components/selection-toolbar-error-alert"
-import { SelectionToolbarFooterContent } from "../../components/selection-toolbar-footer-content"
-import { SelectionToolbarTitleContent } from "../../components/selection-toolbar-title-content"
 import {
   isSelectionToolbarOpenAtom,
   noteSuggestionProviderAtom,
   selectionSessionAtom,
   selectionToolbarTranslateRequestAtom,
 } from "../atoms"
-import { isSaveToNotebaseDialogOpenAtom } from "../custom-action-button/save-to-notebase-dialog-atom"
-import {
-  createSelectionToolbarPrecheckError,
-  createSelectionToolbarRuntimeError,
-  isAbortError,
-} from "../inline-error"
 import { NoteSuggestionCard } from "../note-suggestion/note-suggestion-card"
 import { useNoteSuggestion } from "../note-suggestion/use-note-suggestion"
 import { useSelectionOpenRequestResolver } from "../use-selection-open-request"
@@ -388,7 +389,7 @@ export function SelectionTranslationProvider({ children }: { children: ReactNode
     useSelectionOpenRequestResolver(selectionSession)
   const selectionText = activeSession?.selectionSnapshot.text ?? null
   const paragraphsText = activeSession?.contextSnapshot.text ?? selectionText
-  const titleText = document.title || null
+  const titleText = getSourceDocumentTitle() || null
   const translateProviders = useMemo(
     () => getSelectableProvidersForCapability("selectionTranslation", providersConfig),
     [providersConfig],
