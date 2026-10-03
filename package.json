@@ -5,6 +5,9 @@
   "description": "Read Frog browser extension for language learning",
   "type": "module",
   "scripts": {
+    "chatgpt:bridge": "node scripts/chatgpt-bridge.mjs",
+    "sync:upstream": "node scripts/sync-upstream.mjs",
+    "test:sync": "node --test scripts/sync-support.node-test.mjs",
     "build": "wxt build",
     "build:edge": "wxt build -b edge",
     "build:firefox": "wxt build -b firefox --mv3",

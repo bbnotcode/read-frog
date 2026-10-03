@@ -4,6 +4,7 @@ import { useAtom } from "jotai"
 import { useEffect, useState } from "react"
 import { Checkbox } from "@/components/ui/base-ui/checkbox"
 import { i18n } from "@/utils/i18n"
+import { isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
 import { cn } from "@/utils/styles/utils"
 import { highlightedProviderFieldAtom, PROVIDER_FIELD_HIGHLIGHT_DURATION_MS } from "../atoms"
 import { ConnectionTestButton } from "./components/connection-button"
@@ -31,6 +32,14 @@ export const APIKeyField = withForm({
     }, [isHighlighted, setHighlightedField])
 
     const providerType = providerConfig.provider
+    if (isChatGPTLocalProvider(providerConfig)) {
+      return (
+        <div className="flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 p-3 text-sm">
+          <span>使用本机 ChatGPT 登录授权，无需 API key。</span>
+          <ConnectionTestButton providerConfig={providerConfig} />
+        </div>
+      )
+    }
     if (providerType === "ollama") {
       return <></>
     }

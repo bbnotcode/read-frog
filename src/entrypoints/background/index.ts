@@ -11,6 +11,7 @@ import { logger } from "@/utils/logger"
 import { onMessage } from "@/utils/message"
 import { openOptionsPage } from "@/utils/navigation"
 import { SessionCacheGroupRegistry } from "@/utils/session-cache/session-cache-group-registry"
+import { explainWithChatGPT } from "@/utils/vocabulary-hunter/chatgpt-bridge"
 import { runAiSegmentSubtitles } from "./ai-segmentation"
 import { dispatchBackgroundStreamPort } from "./background-stream"
 import { initializeActionIcons, registerActionIconListeners } from "./browser-action-icon"
@@ -39,6 +40,8 @@ import { setupSubtitlesTranslationHandlers } from "./subtitles-translation"
 import { translationMessage } from "./translation-signal"
 import { setupTTSPlaybackMessageHandlers } from "./tts-playback"
 import { setupUninstallSurvey } from "./uninstall-survey"
+import { setupVideoSummaryHandlers } from "./video-summary"
+import { registerVocabularyChatGPTStream } from "./vocabulary-chatgpt-stream"
 import {
   createVocabularyWordbook,
   mergeVocabularyWordData,
@@ -47,12 +50,12 @@ import {
   setupVocabularyGistAutoSync,
   updateVocabularyWord,
 } from "./vocabulary-gist-sync"
-import { setupVideoSummaryHandlers } from "./video-summary"
 
 export default defineBackground({
   type: "module",
   main: () => {
     logger.info("Hello background!", { id: browser.runtime.id })
+    registerVocabularyChatGPTStream()
 
     browser.runtime.onInstalled.addListener(async (details) => {
       // First, and for every reason rather than just "install": this is the only place the
@@ -98,6 +101,7 @@ export default defineBackground({
       await openOptionsPage(message.data)
     })
 
+    onMessage("explainVocabularyWithChatGPT", async (message) => explainWithChatGPT(message.data))
     onMessage("syncVocabularyGist", async () => ({ ok: await runVocabularyGistSync() }))
     onMessage("updateVocabularyWord", async (message) =>
       updateVocabularyWord(message.data.word, message.data.status, message.data.updatedAt),

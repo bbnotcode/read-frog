@@ -31,6 +31,11 @@ import type {
 import { defineExtensionMessaging } from "@webext-core/messaging"
 
 interface ProtocolMap {
+  explainVocabularyWithChatGPT: (data: {
+    word: string
+    sentence: string
+    model?: string
+  }) => Promise<import("./vocabulary-hunter/chatgpt-bridge").ChatGPTExplanation>
   // navigation
   openPage: (data: { url: string; active?: boolean }) => void
   openOptionsPage: (data?: { route?: `/${string}` }) => void

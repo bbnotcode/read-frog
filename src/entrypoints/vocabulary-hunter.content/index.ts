@@ -1,7 +1,11 @@
 import type { ContentScriptContext } from "#imports"
-import { defineContentScript } from "#imports"
+import type { Config } from "@/types/config/config"
+import { browser, storage, defineContentScript } from "#imports"
 import { getLocalConfig } from "@/utils/config/storage"
+import { CONFIG_STORAGE_KEY } from "@/utils/constants/config"
 import { sendMessage } from "@/utils/message"
+import { isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
+import { resolveModelId } from "@/utils/providers/model-id"
 import { scheduleIdleTask } from "@/utils/schedule-idle-task"
 import { resolveVocabularyDictionaryAction } from "@/utils/vocabulary-hunter/ai-action"
 import { createPredictedKnownIndices } from "@/utils/vocabulary-hunter/assessment"
@@ -12,12 +16,18 @@ import {
   type VocabularyLevel,
   type VocabularyStatus,
 } from "@/utils/vocabulary-hunter/candidates"
+import { streamVocabularyExplanation } from "@/utils/vocabulary-hunter/chatgpt-stream"
 import {
   getVocabularyLevel,
   loadVocabularyDictionary,
 } from "@/utils/vocabulary-hunter/dictionary-data"
 import { lookupEmbeddedDictionary } from "@/utils/vocabulary-hunter/dictionary-lookup"
 import { isEnglishVocabularyContext } from "@/utils/vocabulary-hunter/english-context"
+import {
+  explanationContextKey,
+  explanationProviderKey,
+  shouldAutomaticallyExplain,
+} from "@/utils/vocabulary-hunter/explanation-context"
 import { shouldRefreshVocabularyHighlights } from "@/utils/vocabulary-hunter/highlight-refresh"
 import { pointIntersectsAnyRect } from "@/utils/vocabulary-hunter/hover-stability"
 import {
@@ -25,6 +35,7 @@ import {
   isVocabularyInteractiveTarget,
   VOCABULARY_INTERACTIVE_SELECTOR,
 } from "@/utils/vocabulary-hunter/interactive-target"
+import { renderExplanationMarkdown } from "@/utils/vocabulary-hunter/markdown"
 import {
   getVocabularyHunterState,
   type VocabularyHunterState,
@@ -37,6 +48,7 @@ import {
   EXTERNAL_CUSTOM_ACTION_RESULT_EVENT,
   openExternalSelectionCustomAction,
 } from "../selection.content/selection-toolbar/external-custom-action-source"
+import vocabularyCardStyles from "./card.css?raw"
 
 const UNKNOWN_HIGHLIGHT = "read-frog-vocabulary-unknown"
 const FUZZY_HIGHLIGHT = "read-frog-vocabulary-fuzzy"
@@ -179,62 +191,11 @@ function createHoverCard() {
     "all:initial;position:fixed;inset:0;z-index:2147483646;pointer-events:none;font-family:Inter,system-ui,sans-serif"
   const shadow = host.attachShadow({ mode: "open" })
   shadow.innerHTML = `
-    <style>
-      *{box-sizing:border-box}
-      #card{display:none;position:fixed;width:min(430px,calc(100vw - 24px));max-width:calc(100vw - 24px);
-        max-height:min(580px,calc(100vh - 24px));
-        overflow:auto;padding:17px;border:1px solid #dbe7df;border-radius:20px;
-        background:linear-gradient(180deg,#fff 0%,#fbfdfb 100%);color:#17221c;
-        box-shadow:0 22px 70px #17372130,0 3px 12px #17372118;pointer-events:auto}
-      #card.open{display:block}
-      .head{display:flex;align-items:start;justify-content:space-between;gap:10px}
-      .wordline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.word{font-size:25px;font-weight:760;line-height:1.2}
-      .level{padding:3px 7px;border-radius:999px;background:#edf6f0;color:#356046;font-size:10px;font-weight:650}
-      .status{font-size:11px;color:#647067;margin-top:4px}
-      .sentence{margin:10px 0;color:#46554c;font-size:12px;line-height:1.5}
-      .row{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
-      button,a{font:inherit;border:1px solid #d6e0da;border-radius:10px;background:#f7faf8;color:#23362a;
-        padding:8px 10px;text-decoration:none;cursor:pointer;transition:.15s ease}
-      button:hover,a:hover{transform:translateY(-1px);background:#edf8f0}
-      .judgement{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:4px;background:#f2f6f3;border-radius:13px}
-      .judgement button{min-width:0;border:0;background:transparent;white-space:nowrap}.judgement button.active[data-action=known]{background:#dcfce7;color:#166534}
-      .judgement button.active[data-action=fuzzy]{background:#fef3c7;color:#92400e}
-      .judgement button.active[data-action=unknown]{background:#ffe4e6;color:#9f1239}
-      .shortcut{display:inline-grid;place-items:center;min-width:19px;height:19px;margin-left:5px;padding:0 5px;border:1px solid currentColor;
-        border-radius:6px;background:#fff9;font:700 10px/1 ui-monospace,SFMono-Regular,monospace;vertical-align:1px}
-      .tabs{padding-bottom:2px;border-bottom:1px solid #e6ece8}.tabs button{font-size:12px;padding:7px 9px;cursor:grab}
-      .tabs button.dragging{opacity:.45}.tabs button.drag-over{outline:2px solid #79a98b;outline-offset:2px}
-      .tabs button[data-dict=haici]{color:#087f5b}.tabs button[data-dict=ai]{color:#6d28d9}
-      .tabs button.active{color:#fff;background:#28543a;border-color:#28543a}
-      .tabs button.active[data-dict=haici]{background:#0f8b6d;border-color:#0f8b6d}
-      .tabs button.active[data-dict=ai]{background:#6d4acb;border-color:#6d4acb}
-      .result{display:none;max-height:280px;overflow:auto;margin-top:12px;padding:12px 13px;border:1px solid #e3ebe5;border-radius:13px;background:#fff}
-      .result.open{display:block}.loading{color:#52695a;font-size:12px}.error{color:#b42318}
-      .dict-title{font-size:11px;font-weight:700;color:#748079;margin-bottom:7px}.dict-text{white-space:pre-wrap;font-size:13px;line-height:1.65}
-      .entry-word{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}.entry-word strong{font-size:22px;color:#23824b}
-      .entry-level{padding:3px 7px;border-radius:999px;background:#e8f5ed;color:#397052;font-size:10px}
-      .phonetics{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.phonetic{padding:6px 9px;border-radius:9px;background:#f1f6f9;color:#315b70}
-      .phonetic b{margin-right:5px;color:#6b7c84;font-size:11px}.phonetic span{font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px}
-      .meanings{display:grid;gap:7px}.meaning{display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:start}
-      .pos{padding:3px 6px;border-radius:7px;background:#e9f7ed;color:#247442;text-align:center;font-size:12px;font-weight:750}
-      .definition{color:#26362d;font-size:13px;line-height:1.55}.forms{margin-top:10px;padding-top:9px;border-top:1px dashed #dce6df;color:#66746b;font-size:12px}
-      details{margin-top:10px;border-top:1px solid #e5ece7;padding-top:9px}summary{cursor:pointer;color:#387353;font-size:12px;font-weight:650}
-      .details-text{margin-top:8px;white-space:pre-wrap;color:#4c5b52;font-size:12px;line-height:1.65}
-      .suggestions{display:grid;gap:7px;margin-top:10px}.suggestion{display:block;width:100%;text-align:left;padding:9px 10px}
-      .suggestion strong{display:block;color:#1683a2;font-size:14px}.suggestion span{display:block;margin-top:2px;color:#536159;font-size:12px;line-height:1.45}
-      dl{margin:0;display:grid;gap:8px}dt{font-size:11px;color:#758078}dd{margin:2px 0 0;white-space:pre-wrap;
-        font-size:13px;line-height:1.5}.close{padding:3px 7px;border:0;background:transparent;font-size:18px}
-      #toast{position:fixed;right:20px;bottom:20px;display:flex;align-items:center;gap:10px;max-width:min(360px,calc(100vw - 40px));
-        padding:12px 16px;border:1px solid #b9dfc7;border-radius:14px;background:linear-gradient(135deg,#f0fdf4,#fff);
-        color:#166534;box-shadow:0 14px 38px #1737212b;font-size:13px;font-weight:650;opacity:0;transform:translateY(12px) scale(.98);
-        transition:opacity .2s ease,transform .2s ease;pointer-events:none}
-      #toast::before{content:'✓';display:grid;place-items:center;width:24px;height:24px;border-radius:999px;background:#22c55e;color:#fff;font-weight:800}
-      #toast.open{opacity:1;transform:translateY(0) scale(1)}
-    </style>
+    <style>${vocabularyCardStyles}</style>
     <section id="card" role="dialog" aria-label="ReadFrog 生词卡">
       <div class="head">
         <div><div class="wordline"><div class="word" id="word"></div><span class="level" id="level"></span></div><div class="status" id="status"></div></div>
-        <button class="close" data-action="close" title="关闭">×</button>
+        <button class="close" data-action="close" title="关闭" aria-label="关闭生词卡">×</button>
       </div>
       <div class="sentence" id="sentence"></div>
       <div class="row judgement">
@@ -430,6 +391,8 @@ async function start(ctx: ContentScriptContext) {
   if (!("highlights" in CSS) || typeof Highlight === "undefined") return
 
   let state = await getVocabularyHunterState()
+  let automaticAI = (await browser.storage.local.get("wordHunterAutoAI")).wordHunterAutoAI === true
+  let selectedContext = ""
   let vocabularyDictionary: Awaited<ReturnType<typeof loadVocabularyDictionary>> | undefined
   let predictedKnownIndices: ReadonlySet<number> = new Set()
   const ensureVocabularyDictionary = async () => {
@@ -467,8 +430,18 @@ async function start(ctx: ContentScriptContext) {
   let pendingHover: TrackedRange | null = null
   let latestPointerPosition: { clientX: number; clientY: number } | undefined
   let selectedFromTextSelection = false
+  let cardPinned = false
+  let preferredDictionary: VocabularyDictionary | undefined
   let activeExternalRequestId: number | undefined
   let requestSequence = 0
+  let aiController: AbortController | undefined
+  let aiContext = ""
+  const invalidateExplanation = () => {
+    aiController?.abort()
+    aiController = undefined
+    aiContext = ""
+    return ++requestSequence
+  }
   const unknownHighlight = new Highlight()
   const fuzzyHighlight = new Highlight()
   CSS.highlights.set(UNKNOWN_HIGHLIGHT, unknownHighlight)
@@ -529,6 +502,12 @@ async function start(ctx: ContentScriptContext) {
       const term = document.createElement("dt")
       term.textContent = key
       const description = document.createElement("dd")
+      if (preferredDictionary === "ai" && typeof fieldValue === "string") {
+        description.style.whiteSpace = "normal"
+        description.append(renderExplanationMarkdown(fieldValue))
+        list.append(term, description)
+        return
+      }
       description.textContent =
         typeof fieldValue === "string" ||
         typeof fieldValue === "number" ||
@@ -553,6 +532,7 @@ async function start(ctx: ContentScriptContext) {
   }
 
   const setActiveDictionary = (dictionary: VocabularyDictionary) => {
+    preferredDictionary = dictionary
     shadow.querySelectorAll("[data-dict]").forEach((button) => {
       button.classList.toggle("active", (button as HTMLElement).dataset.dict === dictionary)
     })
@@ -571,7 +551,8 @@ async function start(ctx: ContentScriptContext) {
     hit: TrackedRange,
   ) => {
     activeExternalRequestId = undefined
-    const currentSequence = ++requestSequence
+    const currentSequence = invalidateExplanation()
+    result.setAttribute("aria-busy", "false")
     setActiveDictionary(dictionary)
     result.classList.add("open")
     result.innerHTML = `<div class="loading">${dictionary === "haici" ? "海词" : dictionary} 正在查询…</div>`
@@ -668,12 +649,96 @@ async function start(ctx: ContentScriptContext) {
     }
   }
 
+  const showAIExplanation = async (hit: TrackedRange) => {
+    const context = explanationContextKey(hit.word, sentenceForRange(hit.range))
+    if (aiController && !aiController.signal.aborted && aiContext === context) return
+    clearTimeout(hideTimer)
+    cardPinned = true
+    const sequence = invalidateExplanation()
+    const controller = new AbortController()
+    aiController = controller
+    aiContext = context
+    let streamTimer: ReturnType<typeof setTimeout> | undefined
+    let streamText = ""
+    const renderStream = () => {
+      streamTimer = undefined
+      if (sequence !== requestSequence || controller.signal.aborted) return
+      const scrollTop = result.scrollTop
+      const meta = document.createElement("div")
+      meta.className = "explanation-meta"
+      meta.textContent = "正在生成…"
+      result.replaceChildren(renderExplanationMarkdown(streamText), meta)
+      result.scrollTop = scrollTop
+    }
+    activeExternalRequestId = undefined
+    setActiveDictionary("ai")
+    card.classList.add("open")
+    result.classList.add("open")
+    result.setAttribute("aria-busy", "true")
+    result.textContent = "正在结合当前语境解释…"
+    try {
+      const config = await getLocalConfig()
+      if (sequence !== requestSequence) return
+      const action = config && resolveVocabularyDictionaryAction(config.selectionToolbar)
+      const provider = config?.providersConfig.find((item) => item.id === action?.providerId)
+      if (isChatGPTLocalProvider(provider) && provider?.provider === "open-responses") {
+        const model = resolveModelId(provider.model)
+        if (!model) throw new Error("请先在订阅设置中选择模型。")
+        const explanation = await streamVocabularyExplanation(
+          {
+            word: hit.word,
+            sentence: sentenceForRange(hit.range),
+            model,
+          },
+          controller.signal,
+          (text) => {
+            streamText = text
+            // Bound Markdown layout work while tokens arrive; never reposition per token.
+            if (streamTimer === undefined) streamTimer = setTimeout(renderStream, 100)
+          },
+        )
+        clearTimeout(streamTimer)
+        if (sequence !== requestSequence) return
+        const meta = document.createElement("div")
+        meta.className = "explanation-meta"
+        const usage = explanation.usage
+        meta.textContent = `${explanation.model || "ChatGPT"} · ${explanation.cached ? "本地缓存 · 本次未请求 OpenAI" : usage ? `输入 ${usage.input_tokens ?? "未知"} / 输出 ${usage.output_tokens ?? "未知"} tokens` : "接口未返回用量"}`
+        result.replaceChildren(renderExplanationMarkdown(explanation.text), meta)
+      } else {
+        activeExternalRequestId = sequence
+        await openReadFrogDictionaryAction(hit, sequence)
+      }
+      if (sequence === requestSequence && selected) positionCard(card, selected)
+    } catch (error) {
+      if (sequence === requestSequence) {
+        if (streamText) {
+          const message = document.createElement("div")
+          message.className = "explanation-meta"
+          message.textContent = `生成未完成：${error instanceof Error ? error.message : "请重试"}`
+          result.replaceChildren(renderExplanationMarkdown(streamText), message)
+        } else renderResult(null, String(error))
+        activeExternalRequestId = undefined
+      }
+    } finally {
+      clearTimeout(streamTimer)
+      if (sequence === requestSequence) {
+        result.setAttribute("aria-busy", "false")
+        aiController = undefined
+        aiContext = ""
+      }
+    }
+  }
+
   const showCard = (hit: TrackedRange, source: "hover" | "selection" = "hover") => {
     clearTimeout(hoverTimer)
     pendingHover = null
     clearTimeout(hideTimer)
     selectedFromTextSelection = source === "selection"
-    const changedWord = selected?.word !== hit.word
+    const contextKey = explanationContextKey(hit.word, sentenceForRange(hit.range))
+    const changedWord = !selected || selectedContext !== contextKey
+    selectedContext = contextKey
+    if (changedWord) cardPinned = source === "selection"
+    else if (source === "selection") cardPinned = true
     selected = hit
     wordLabel.textContent = hit.word
     levelLabel.textContent = getVocabularyLevel(hit.level).label
@@ -686,7 +751,7 @@ async function start(ctx: ContentScriptContext) {
     })
     sentenceLabel.textContent = sentenceForRange(hit.range)
     if (changedWord) {
-      requestSequence += 1
+      invalidateExplanation()
       result.classList.remove("open")
       result.innerHTML = ""
     }
@@ -697,11 +762,22 @@ async function start(ctx: ContentScriptContext) {
     card.classList.add("open")
     positionCard(card, hit)
     if (changedWord) {
+      if (
+        shouldAutomaticallyExplain(preferredDictionary, automaticAI) &&
+        state.enabledDictionaries.includes("ai")
+      ) {
+        void showAIExplanation(hit)
+        return
+      }
       const defaultDictionary =
-        state.dictionaryOrder.find(
-          (item): item is Exclude<VocabularyDictionary, "ai"> =>
-            item !== "ai" && state.enabledDictionaries.includes(item),
-        ) ?? "haici"
+        preferredDictionary &&
+        preferredDictionary !== "ai" &&
+        state.enabledDictionaries.includes(preferredDictionary)
+          ? preferredDictionary
+          : (state.dictionaryOrder.find(
+              (item): item is Exclude<VocabularyDictionary, "ai"> =>
+                item !== "ai" && state.enabledDictionaries.includes(item),
+            ) ?? "haici")
       void showEmbeddedDictionary(defaultDictionary, hit)
     }
   }
@@ -712,6 +788,8 @@ async function start(ctx: ContentScriptContext) {
     clearTimeout(hideTimer)
     hideTimer = setTimeout(() => {
       if (
+        cardPinned ||
+        selectedFromTextSelection ||
         card.matches(":hover") ||
         (selected &&
           latestPointerPosition &&
@@ -724,7 +802,7 @@ async function start(ctx: ContentScriptContext) {
         return
       }
       card.classList.remove("open")
-      requestSequence += 1
+      invalidateExplanation()
     }, 260)
   }
 
@@ -920,6 +998,8 @@ async function start(ctx: ContentScriptContext) {
     const event = latestMouseMove
     latestMouseMove = undefined
     if (!event || !state.enabled || event.composedPath().includes(host)) return
+    // A pinned explanation must not be replaced by incidental pointer movement.
+    if (cardPinned && card.classList.contains("open")) return
     const hit = hitTest(event.clientX, event.clientY, event.target)
     if (!hit) {
       hideCardSoon()
@@ -955,7 +1035,14 @@ async function start(ctx: ContentScriptContext) {
     const target = event.target
     if (target instanceof Node && isVocabularyInteractiveTarget(target)) return
     const hit = hitTest(event.clientX, event.clientY, target)
-    if (!hit) return
+    if (!hit) {
+      card.classList.remove("open")
+      cardPinned = false
+      selectedFromTextSelection = false
+      activeExternalRequestId = undefined
+      invalidateExplanation()
+      return
+    }
     event.preventDefault()
     event.stopImmediatePropagation()
     showCard(hit)
@@ -1115,6 +1202,9 @@ async function start(ctx: ContentScriptContext) {
     const selectedLevel = selected.level
     card.classList.remove("open")
     selected = null
+    cardPinned = false
+    activeExternalRequestId = undefined
+    invalidateExplanation()
     selectedFromTextSelection = false
     window.getSelection()?.removeAllRanges()
 
@@ -1125,6 +1215,14 @@ async function start(ctx: ContentScriptContext) {
     if (eventComesFromEditableControl(event)) return
     if (event.altKey || event.ctrlKey || event.metaKey) return
     const key = event.key.toLowerCase()
+    if (key === "escape") {
+      card.classList.remove("open")
+      cardPinned = false
+      selectedFromTextSelection = false
+      activeExternalRequestId = undefined
+      invalidateExplanation()
+      return
+    }
     const pageSelection = window.getSelection()
     if (key === "d" && pageSelection && !pageSelection.isCollapsed) {
       const normalizedWord = normalizeSelectedWord(pageSelection.toString())
@@ -1139,6 +1237,9 @@ async function start(ctx: ContentScriptContext) {
       event.stopImmediatePropagation()
       card.classList.remove("open")
       selected = null
+      cardPinned = false
+      activeExternalRequestId = undefined
+      invalidateExplanation()
       selectedFromTextSelection = false
       pageSelection.removeAllRanges()
       void markWord(word, "unknown", selectedRange ?? undefined, selectedLevel)
@@ -1159,6 +1260,8 @@ async function start(ctx: ContentScriptContext) {
   document.addEventListener("keydown", handleShortcut, true)
 
   shadow.addEventListener("click", (event) => {
+    clearTimeout(hideTimer)
+    cardPinned = true
     const summary = (event.target as HTMLElement).closest("summary")
     if (summary) {
       event.preventDefault()
@@ -1187,18 +1290,7 @@ async function start(ctx: ContentScriptContext) {
     if (suppressDictionaryClick) return
     if (dictionary && selected) {
       if (dictionary === "ai") {
-        const currentRequestId = ++requestSequence
-        activeExternalRequestId = currentRequestId
-        setActiveDictionary("ai")
-        result.classList.add("open")
-        result.innerHTML = '<div class="loading">ReadFrog AI 正在结合当前语境解释…</div>'
-        const hit = selected
-        void openReadFrogDictionaryAction(hit, currentRequestId).catch((error) => {
-          if (activeExternalRequestId === currentRequestId) {
-            renderResult(null, error instanceof Error ? error.message : "无法打开 ReadFrog 词典")
-            activeExternalRequestId = undefined
-          }
-        })
+        void showAIExplanation(selected)
       } else {
         void showEmbeddedDictionary(dictionary, selected)
       }
@@ -1209,9 +1301,10 @@ async function start(ctx: ContentScriptContext) {
       .action
     if (!action) return
     if (action === "close") {
+      cardPinned = false
       card.classList.remove("open")
       activeExternalRequestId = undefined
-      requestSequence += 1
+      invalidateExplanation()
       selectedFromTextSelection = false
       return
     }
@@ -1255,8 +1348,21 @@ async function start(ctx: ContentScriptContext) {
       void refresh()
     }
   })
+  const unwatchAI = storage.watch<boolean>("local:wordHunterAutoAI", (value) => {
+    automaticAI = value === true
+  })
+  const unwatchConfig = storage.watch<Config>(`local:${CONFIG_STORAGE_KEY}`, (value, oldValue) => {
+    if (explanationProviderKey(value) === explanationProviderKey(oldValue)) return
+    // Only relevant provider/action changes cancel an explanation; unrelated settings do not.
+    selectedContext = ""
+    invalidateExplanation()
+    activeExternalRequestId = undefined
+    result.replaceChildren()
+    result.classList.remove("open")
+  })
 
   ctx.onInvalidated(() => {
+    invalidateExplanation()
     clearTimeout(refreshTimer)
     clearTimeout(hideTimer)
     clearTimeout(hoverTimer)
@@ -1277,6 +1383,8 @@ async function start(ctx: ContentScriptContext) {
     document.removeEventListener("mousemove", handleMouseMove, true)
     document.removeEventListener("click", handlePageClick, true)
     unwatchState()
+    unwatchAI()
+    unwatchConfig()
     clearHighlights()
     CSS.highlights.delete(UNKNOWN_HIGHLIGHT)
     CSS.highlights.delete(FUZZY_HIGHLIGHT)

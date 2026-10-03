@@ -37,6 +37,7 @@ import {
 import { compactObject } from "@/types/utils"
 import { getLLMProvidersConfig, getProviderConfigById } from "../config/helpers"
 import { CONFIG_STORAGE_KEY } from "../constants/config"
+import { getChatGPTLocalHeaders, isChatGPTLocalProvider } from "./chatgpt-local"
 import { getProviderHeadersWithOverride } from "./headers"
 import { resolveModelId } from "./model-id"
 
@@ -128,6 +129,13 @@ export function getLanguageModelForConfig(providerConfig: LLMProviderConfig) {
       createOpenResponses({
         name: matchedConfig.provider,
         url: matchedConfig.url,
+        ...(isChatGPTLocalProvider(matchedConfig) && {
+          fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+            const requestHeaders = new Headers(init?.headers)
+            requestHeaders.set("Authorization", (await getChatGPTLocalHeaders()).Authorization)
+            return fetch(input, { ...init, headers: requestHeaders })
+          },
+        }),
         ...(matchedConfig.apiKey && { apiKey: matchedConfig.apiKey }),
         ...(headers && { headers }),
       }),

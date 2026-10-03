@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG } from "@/utils/constants/config"
 import { executeTranslate } from "@/utils/host/translate/execute-translate"
 import { i18n } from "@/utils/i18n"
 import { getTranslatePrompt } from "@/utils/prompts/translate"
+import { isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
 import { getProviderConnectionURL } from "@/utils/providers/connection-url"
 
 const SLOW_CONNECTION_THRESHOLD_MS = 3_000
@@ -191,7 +192,13 @@ export function ConnectionTestButton({ providerConfig }: { providerConfig: APIPr
       variant="outline"
       className="gap-2"
       onClick={handleTestConnection}
-      disabled={mutation.isPending || (!apiKey && provider !== "deeplx" && provider !== "ollama")}
+      disabled={
+        mutation.isPending ||
+        (!apiKey &&
+          provider !== "deeplx" &&
+          provider !== "ollama" &&
+          !isChatGPTLocalProvider(providerConfig))
+      }
     >
       {mutation.isPending ? (
         <>

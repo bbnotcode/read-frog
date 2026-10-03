@@ -47,3 +47,9 @@ scripts/output/
 
 reference/
 .gstack/
+.chatgpt-bridge/
+
+# Personal local QA records (reading history, counts and machine paths).
+CHATGPT-REGRESSION-QA.md
+UPSTREAM-SYNC.md
+scripts/raycast-readfrog/*.plist

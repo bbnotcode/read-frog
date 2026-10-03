@@ -3,6 +3,7 @@ import { Link, useInRouterContext } from "react-router"
 import { isAPIProviderConfig, isPureAPIProvider } from "@/types/config/provider"
 import { i18n } from "@/utils/i18n"
 import { buildProviderConfigRoute, openOptionsPage } from "@/utils/navigation"
+import { isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
 
 const LINK_CLASS = "cursor-pointer text-link hover:underline"
 
@@ -15,6 +16,7 @@ function needsApiKeyWarning(
 ): providerConfig is ProviderConfig {
   return (
     !!providerConfig &&
+    !isChatGPTLocalProvider(providerConfig) &&
     isAPIProviderConfig(providerConfig) &&
     !isPureAPIProvider(providerConfig.provider) &&
     !providerConfig.apiKey

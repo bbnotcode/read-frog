@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ChatGPT 订阅设置</title>
+  </head>
+  <body>
+    <h1>ChatGPT 订阅设置</h1>
+    <p>先运行本地服务，再登录 ChatGPT。解释时会发送单词和当前句子，消耗你授权的套餐额度。</p>
+    <a href="http://127.0.0.1:17373/" target="_blank" rel="noopener">打开本地服务，登录 ChatGPT</a>
+    <p>
+      <label>本地服务配对码 <input id="pairing" type="password" autocomplete="off" /></label
+      ><button id="connect">连接并读取模型</button>
+    </p>
+    <p>
+      <label
+        >模型
+        <select id="model"></select></label
+      ><button id="save">保存</button>
+    </p>
+    <p id="status" role="status"></p>
+    <script type="module" src="./chatgpt-bridge/main.ts"></script>
+  </body>
+</html>

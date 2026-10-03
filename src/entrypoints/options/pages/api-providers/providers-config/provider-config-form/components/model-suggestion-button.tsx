@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/base-ui/combobox"
 import { extractErrorMessage } from "@/utils/error/extract-message"
 import { i18n } from "@/utils/i18n"
+import { getChatGPTLocalHeaders, isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
 import { getProviderConnectionURL } from "@/utils/providers/connection-url"
 import { getProviderModelsURL } from "@/utils/providers/models-url"
 
@@ -41,12 +42,14 @@ export function ModelSuggestionButton({
       errorDescription: i18n.t("options.apiProviders.form.models.fetchError"),
     },
     mutationFn: async () => {
-      if (!apiKey) {
+      if (!apiKey && !isChatGPTLocalProvider(providerConfig)) {
         throw new Error(i18n.t("options.apiProviders.form.models.apiKeyRequired"))
       }
 
       const response = await fetch(getProviderModelsURL(providerConfig), {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: isChatGPTLocalProvider(providerConfig)
+          ? await getChatGPTLocalHeaders()
+          : { Authorization: `Bearer ${apiKey}` },
       })
       if (!response.ok) {
         throw new Error(await extractErrorMessage(response))

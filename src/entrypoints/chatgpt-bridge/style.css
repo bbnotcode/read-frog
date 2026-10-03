@@ -1,0 +1,55 @@
+body {
+  max-width: 720px;
+  margin: 64px auto;
+  padding: 24px;
+  font:
+    16px/1.7 system-ui,
+    sans-serif;
+  color: #173b2b;
+  background: #f5faf7;
+}
+h1 {
+  font-size: 28px;
+}
+a {
+  color: #166534;
+}
+label {
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+input,
+select,
+button {
+  font: inherit;
+  border: 1px solid #b9d5c4;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: white;
+}
+input {
+  width: 260px;
+  max-width: 80vw;
+}
+button {
+  margin-left: 12px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+#status {
+  min-height: 2em;
+  white-space: pre-wrap;
+}
+@media (max-width: 600px) {
+  body {
+    margin: 16px auto;
+  }
+  button {
+    margin: 12px 0;
+  }
+}

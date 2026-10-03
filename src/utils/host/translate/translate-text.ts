@@ -18,6 +18,7 @@ import { trackGlossaryUsed } from "@/utils/glossary/analytics"
 import { i18n } from "@/utils/i18n"
 import { logger } from "@/utils/logger"
 import { getTranslatePrompt } from "@/utils/prompts/translate"
+import { isChatGPTLocalProvider } from "@/utils/providers/chatgpt-local"
 import { serializeProviderRef } from "@/utils/providers/provider-ref"
 import { resolveProviderRefForCapability } from "@/utils/providers/provider-registry"
 import { TranslationCancelledError } from "@/utils/request/cancellation"
@@ -465,6 +466,7 @@ export function validateTranslationConfigAndToast(
   if (
     provider.kind === "local" &&
     isAPIProviderConfig(provider.config) &&
+    !isChatGPTLocalProvider(provider.config) &&
     !provider.config.apiKey?.trim() &&
     !["deeplx", "ollama"].includes(provider.config.provider)
   ) {
